@@ -5,12 +5,14 @@ import UploadWork from './pages/UploadWork'
 import TeachingRecord from './pages/TeachingRecord'
 import WorkDetail from './pages/WorkDetail'
 import Settings from './pages/Settings'
-import { locationsAPI } from './lib/supabase'
+import { locationsAPI, filterOptionsAPI, seniorsAPI } from './lib/supabase'
 import './App.css'
 
 function App() {
   const [currentLocation, setCurrentLocation] = useState(null)
   const [locations, setLocations] = useState([])
+  const [filterOptions, setFilterOptions] = useState({ season: [], festival: [], material_type: [] })
+  const [seniors, setSeniors] = useState([])
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode')
     return saved === 'true' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -25,7 +27,6 @@ function App() {
     }
   }, [darkMode])
 
-  // 全域載入中心列表 - 所有元件共用
   const refreshLocations = useCallback(async () => {
     try {
       const data = await locationsAPI.getAll()
@@ -37,9 +38,32 @@ function App() {
     }
   }, [])
 
+  const refreshFilterOptions = useCallback(async () => {
+    try {
+      const data = await filterOptionsAPI.getAll()
+      setFilterOptions(data)
+      return data
+    } catch (error) {
+      console.error('載入篩選條件失敗:', error)
+      return { season: [], festival: [], material_type: [] }
+    }
+  }, [])
+
+  const refreshSeniors = useCallback(async () => {
+    try {
+      const data = await seniorsAPI.getAll()
+      setSeniors(data)
+      return data
+    } catch (error) {
+      console.error('載入長輩失敗:', error)
+      return []
+    }
+  }, [])
+
+  // 啟動時平行載入所有全域資料
   useEffect(() => {
-    refreshLocations()
-  }, [refreshLocations])
+    Promise.all([refreshLocations(), refreshFilterOptions(), refreshSeniors()])
+  }, [refreshLocations, refreshFilterOptions, refreshSeniors])
 
   return (
     <Router>
@@ -67,9 +91,9 @@ function App() {
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Routes>
-            <Route path="/" element={<WorksGallery currentLocation={currentLocation} />} />
-            <Route path="/upload" element={<UploadWork />} />
-            <Route path="/record/:workId" element={<TeachingRecord currentLocation={currentLocation} />} />
+            <Route path="/" element={<WorksGallery currentLocation={currentLocation} filterOptions={filterOptions} />} />
+            <Route path="/upload" element={<UploadWork filterOptions={filterOptions} />} />
+            <Route path="/record/:workId" element={<TeachingRecord currentLocation={currentLocation} allSeniors={seniors} />} />
             <Route path="/work/:workId" element={<WorkDetail currentLocation={currentLocation} />} />
             <Route 
               path="/settings" 
@@ -78,7 +102,11 @@ function App() {
                   darkMode={darkMode} 
                   setDarkMode={setDarkMode}
                   locations={locations}
+                  seniors={seniors}
+                  filterOptions={filterOptions}
                   onLocationsUpdate={refreshLocations}
+                  onSeniorsUpdate={refreshSeniors}
+                  onFilterOptionsUpdate={refreshFilterOptions}
                 />
               } 
             />
