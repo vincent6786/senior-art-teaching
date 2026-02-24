@@ -14,6 +14,7 @@ function App() {
     const saved = localStorage.getItem('darkMode')
     return saved === 'true' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)
   })
+  const [customLogo, setCustomLogo] = useState(null)
 
   // 監聽 dark mode 變化，更新 localStorage 和 class
   useEffect(() => {
@@ -25,6 +26,12 @@ function App() {
     }
   }, [darkMode])
 
+  // 載入自訂 Logo
+  useEffect(() => {
+    const logo = localStorage.getItem('customLogo')
+    setCustomLogo(logo)
+  }, [])
+
   return (
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
@@ -32,8 +39,19 @@ function App() {
         <nav className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg text-gray-900 dark:text-white shadow-lg sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
-              <Link to="/" className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent hover:scale-105 transition-transform">
-                🎨 教學管理
+              <Link to="/" className="flex items-center gap-3 hover:scale-105 transition-transform">
+                {customLogo ? (
+                  <img
+                    src={customLogo}
+                    alt="Logo"
+                    className="h-10 w-10 object-contain"
+                  />
+                ) : (
+                  <span className="text-3xl">🎨</span>
+                )}
+                <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
+                  教學管理
+                </span>
               </Link>
               
               {/* 中心選擇器 */}

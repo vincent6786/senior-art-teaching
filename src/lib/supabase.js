@@ -275,7 +275,146 @@ export const teachingRecordsAPI = {
   }
 }
 
-// 5. 篩選條件管理 API (新增！)
+// 5. 系統管理 API (容量、備份、Logo)
+export const systemAPI = {
+  // 取得儲存空間使用情況
+  async getStorageUsage() {
+    try {
+      // 取得所有圖片檔案
+      const { data: files, error } = await supabase.storage
+        .from('images')
+        .list('works', {
+          limit: 1000,
+          sortBy: { column: 'created_at', order: 'desc' }
+        })
+
+      if (error) throw error
+
+      // 計算總大小（bytes）
+      const totalSize = files.reduce((sum, file) => sum + (file.metadata?.size || 0), 0)
+      
+      // Supabase 免費方案：500MB
+      const limitBytes = 500 * 1024 * 1024
+      const usedMB = (totalSize / (1024 * 1024)).toFixed(2)
+      const limitMB = 500
+      const usedPercent = ((totalSize / limitBytes) * 100).toFixed(1)
+
+      return {
+        totalSize,
+        usedMB,
+        limitMB,
+        usedPercent,
+        remainingMB: (limitMB - usedMB).toFixed(2),
+        fileCount: files.length
+      }
+    } catch (error) {
+      console.error('取得容量失敗:', error)
+      return null
+    }
+  },
+
+  // 備份所有資料
+  async backupAllData() {
+    try {
+      // 取得所有資料表的資料
+      const [works, locations, seniors, teachingRecords, filterOptions] = await Promise.all([
+        supabase.from('works').select('*'),
+        supabase.from('locations').select('*'),
+        supabase.from('seniors').select('*'),
+        supabase.from('teaching_records').select(`
+          *,
+          teaching_seniors (
+            *,
+            seniors (name)
+          )
+        `),
+        supabase.from('filter_options').select('*')
+      ])
+
+      const backup = {
+        version: '2.0',
+        timestamp: new Date().toISOString(),
+        data: {
+          works: works.data || [],
+          locations: locations.data || [],
+          seniors: seniors.data || [],
+          teaching_records: teachingRecords.data || [],
+          filter_options: filterOptions.data || []
+        },
+        stats: {
+          works_count: works.data?.length || 0,
+          locations_count: locations.data?.length || 0,
+          seniors_count: seniors.data?.length || 0,
+          records_count: teachingRecords.data?.length || 0
+        }
+      }
+
+      return backup
+    } catch (error) {
+      console.error('備份失敗:', error)
+      throw error
+    }
+  },
+
+  // 匯出備份為 JSON 檔案
+  async exportBackup() {
+    const backup = await this.backupAllData()
+    const dataStr = JSON.stringify(backup, null, 2)
+    const dataBlob = new Blob([dataStr], { type: 'application/json' })
+    
+    const url = URL.createObjectURL(dataBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `教學管理系統備份_${new Date().toISOString().split('T')[0]}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    
+    return backup.stats
+  },
+
+  // 上傳 Logo
+  async uploadLogo(file) {
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `logo.${fileExt}`
+      const filePath = `system/${fileName}`
+
+      // 先刪除舊的 Logo（如果存在）
+      await supabase.storage.from('images').remove([filePath])
+
+      // 上傳新的 Logo
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(filePath, file, { upsert: true })
+
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage
+        .from('images')
+        .getPublicUrl(filePath)
+
+      // 存到 localStorage
+      localStorage.setItem('customLogo', data.publicUrl)
+
+      return data.publicUrl
+    } catch (error) {
+      console.error('上傳 Logo 失敗:', error)
+      throw error
+    }
+  },
+
+  // 取得自訂 Logo
+  getCustomLogo() {
+    return localStorage.getItem('customLogo')
+  },
+
+  // 移除自訂 Logo
+  removeCustomLogo() {
+    localStorage.removeItem('customLogo')
+  }
+}
+
+// 6. 篩選條件管理 API
 export const filterOptionsAPI = {
   // 取得所有篩選選項
   async getAll() {
