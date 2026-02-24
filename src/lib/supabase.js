@@ -63,19 +63,24 @@ export const worksAPI = {
     return true
   },
 
-  // 上傳圖片到 Cloudinary（免費 25GB 儲存空間）
+  // 上傳作品主圖：依設定選擇 Cloudinary 或 Supabase(base64)
   async uploadImage(file) {
-    const CLOUD_NAME = 'dbq5zvmwv'
-    const UPLOAD_PRESET = 'vetwuqsc'
+    const mode = localStorage.getItem('storageMode') || 'cloudinary'
+    if (mode === 'supabase') {
+      return this._uploadImageBase64(file, 1200, 0.82)
+    } else {
+      return this._uploadImageCloudinary(file, 'senior-art', 1200, 0.82)
+    }
+  },
 
-    // 先在瀏覽器壓縮，減少上傳流量
-    const compressedBlob = await new Promise((resolve, reject) => {
+  // 內部：base64 壓縮（存 Supabase）
+  async _uploadImageBase64(file, maxSize = 800, quality = 0.78) {
+    return new Promise((resolve, reject) => {
       const img = new Image()
       const reader = new FileReader()
       reader.onload = (e) => {
         img.onload = () => {
           const canvas = document.createElement('canvas')
-          const maxSize = 1200
           let { width, height } = img
           if (width > maxSize || height > maxSize) {
             if (width > height) { height = Math.round(height * maxSize / width); width = maxSize }
@@ -83,7 +88,35 @@ export const worksAPI = {
           }
           canvas.width = width; canvas.height = height
           canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-          canvas.toBlob(resolve, 'image/jpeg', 0.82)
+          resolve(canvas.toDataURL('image/jpeg', quality))
+        }
+        img.onerror = reject
+        img.src = e.target.result
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  },
+
+  // 內部：上傳到 Cloudinary
+  async _uploadImageCloudinary(file, folder = 'senior-art', maxSize = 1200, quality = 0.82) {
+    const CLOUD_NAME = 'dbq5zvmwv'
+    const UPLOAD_PRESET = 'vetwuqsc'
+
+    const blob = await new Promise((resolve, reject) => {
+      const img = new Image()
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          let { width, height } = img
+          if (width > maxSize || height > maxSize) {
+            if (width > height) { height = Math.round(height * maxSize / width); width = maxSize }
+            else { width = Math.round(width * maxSize / height); height = maxSize }
+          }
+          canvas.width = width; canvas.height = height
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+          canvas.toBlob(resolve, 'image/jpeg', quality)
         }
         img.onerror = reject
         img.src = e.target.result
@@ -92,11 +125,10 @@ export const worksAPI = {
       reader.readAsDataURL(file)
     })
 
-    // 上傳到 Cloudinary
     const formData = new FormData()
-    formData.append('file', compressedBlob, 'photo.jpg')
+    formData.append('file', blob, 'photo.jpg')
     formData.append('upload_preset', UPLOAD_PRESET)
-    formData.append('folder', 'senior-art')
+    formData.append('folder', folder)
 
     const res = await fetch(
       `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
@@ -104,8 +136,6 @@ export const worksAPI = {
     )
     const data = await res.json()
     if (data.error) throw new Error('Cloudinary 上傳失敗：' + data.error.message)
-
-    // 回傳 Cloudinary 自動最佳化的網址（webp 格式、自動壓縮）
     return data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/')
   },
 
@@ -265,31 +295,33 @@ export const systemAPI = {
       ])
       if (worksRes.error) throw worksRes.error
 
-      // 分開計算：Supabase（base64）vs Cloudinary（網址）
+      // 細項統計
       let supabaseBytes = 0
-      let cloudinaryCount = 0
-      let base64Count = 0
+      let workBase64 = 0      // 作品主圖 → Supabase(base64)
+      let workCloudinary = 0  // 作品主圖 → Cloudinary
+      let fieldBase64 = 0     // 現場照片 → Supabase(base64)
+      let fieldCloudinary = 0 // 現場照片 → Cloudinary
       const worksCount = worksRes.data?.length || 0
 
+      // 作品主圖
       for (const w of worksRes.data || []) {
         if (!w.image_url) continue
         if (w.image_url.startsWith('data:')) {
           supabaseBytes += Math.round(w.image_url.length * 0.75)
-          base64Count++
+          workBase64++
         } else if (w.image_url.includes('cloudinary.com')) {
-          cloudinaryCount++
+          workCloudinary++
         }
       }
 
-      // 教學現場照片（目前都是 base64）
-      let fieldPhotoCount = 0
+      // 教學現場照片
       for (const r of recordsRes.data || []) {
         for (const p of r.photos || []) {
           if (p?.startsWith('data:')) {
             supabaseBytes += Math.round(p.length * 0.75)
-            fieldPhotoCount++
+            fieldBase64++
           } else if (p?.includes('cloudinary.com')) {
-            cloudinaryCount++
+            fieldCloudinary++
           }
         }
       }
@@ -297,6 +329,9 @@ export const systemAPI = {
       const limitBytes = 500 * 1024 * 1024
       const usedMB = (supabaseBytes / (1024 * 1024)).toFixed(2)
       const usedPercent = ((supabaseBytes / limitBytes) * 100).toFixed(1)
+      const totalPhotos = workBase64 + workCloudinary + fieldBase64 + fieldCloudinary
+      const cloudinaryTotal = workCloudinary + fieldCloudinary
+      const supabaseTotal = workBase64 + fieldBase64
 
       return {
         totalSize: supabaseBytes,
@@ -304,11 +339,17 @@ export const systemAPI = {
         limitMB: 500,
         usedPercent,
         remainingMB: Math.max(0, 500 - parseFloat(usedMB)).toFixed(2),
-        photoCount: base64Count + fieldPhotoCount,
-        cloudinaryCount,
-        base64Count,
-        fieldPhotoCount,
-        worksCount
+        // 總計
+        totalPhotos,
+        worksCount,
+        // Supabase 細項
+        supabaseTotal,
+        workBase64,
+        fieldBase64,
+        // Cloudinary 細項
+        cloudinaryTotal,
+        workCloudinary,
+        fieldCloudinary
       }
     } catch (error) {
       console.error('取得容量失敗:', error)
