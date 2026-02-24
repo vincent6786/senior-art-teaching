@@ -70,21 +70,18 @@ function UploadWork() {
     setLoading(true)
 
     try {
-      // 先建立作品記錄
-      const work = await worksAPI.create({
+      // 壓縮圖片（client-side，直接存 base64，不需要 Storage）
+      const imageUrl = await worksAPI.uploadImage(imageFile)
+
+      // 一次建立作品（含圖片）
+      await worksAPI.create({
         title: formData.title,
         season: formData.season || '不限',
         festival: formData.festival,
         material_type: formData.material_type,
         description: formData.description,
-        image_url: 'temp' // 暫時的
+        image_url: imageUrl
       })
-
-      // 上傳圖片
-      const imageUrl = await worksAPI.uploadImage(imageFile, work.id)
-
-      // 更新作品的圖片網址
-      await worksAPI.update(work.id, { image_url: imageUrl })
 
       alert('作品上傳成功！')
       navigate('/')
@@ -268,7 +265,7 @@ function UploadWork() {
             disabled={loading}
             className="flex-1 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? '上傳中...' : '上傳作品'}
+            {loading ? '⏳ 壓縮並上傳中...' : '上傳作品'}
           </button>
         </div>
       </form>
