@@ -18,11 +18,11 @@ export const worksAPI = {
       .from('works')
       .select('*')
       .order('created_at', { ascending: false })
-    
+
     if (filters.season) query = query.eq('season', filters.season)
     if (filters.festival) query = query.eq('festival', filters.festival)
     if (filters.material_type) query = query.eq('material_type', filters.material_type)
-    
+
     const { data, error } = await query
     if (error) throw error
     return data
@@ -58,24 +58,35 @@ export const worksAPI = {
   },
 
   async delete(id) {
-    const work = await this.getById(id)
-    if (work.image_url) {
-      const path = work.image_url.split('/').slice(-2).join('/')
-      await supabase.storage.from('images').remove([path])
-    }
     const { error } = await supabase.from('works').delete().eq('id', id)
     if (error) throw error
     return true
   },
 
-  async uploadImage(file, workId) {
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${workId}-${Date.now()}.${fileExt}`
-    const filePath = `works/${fileName}`
-    const { error: uploadError } = await supabase.storage.from('images').upload(filePath, file)
-    if (uploadError) throw uploadError
-    const { data } = supabase.storage.from('images').getPublicUrl(filePath)
-    return data.publicUrl
+  // 壓縮圖片並回傳 base64（client-side，不需要 Storage）
+  async uploadImage(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          const maxSize = 800
+          let { width, height } = img
+          if (width > maxSize || height > maxSize) {
+            if (width > height) { height = Math.round(height * maxSize / width); width = maxSize }
+            else { width = Math.round(width * maxSize / height); height = maxSize }
+          }
+          canvas.width = width; canvas.height = height
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+          resolve(canvas.toDataURL('image/jpeg', 0.75))
+        }
+        img.onerror = reject
+        img.src = e.target.result
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
   },
 
   async getLocationHistory(workId, locationId) {
@@ -133,6 +144,7 @@ export const locationsAPI = {
 // 3. 長輩相關
 // ============================================
 export const seniorsAPI = {
+  // 取全部長輩（含所屬中心名稱），供 App 全域使用
   async getAll() {
     const { data, error } = await supabase
       .from('seniors')
@@ -179,11 +191,12 @@ export const teachingRecordsAPI = {
         work_id: record.work_id,
         location_id: record.location_id,
         teaching_date: record.teaching_date,
-        notes: record.notes
+        notes: record.notes,
+        photos: record.photos || []
       }])
       .select()
     if (recordError) throw recordError
-    
+
     const teachingRecordId = recordData[0].id
     if (participants && participants.length > 0) {
       const participantRecords = participants.map(p => ({
@@ -226,21 +239,55 @@ export const teachingRecordsAPI = {
 export const systemAPI = {
   async getStorageUsage() {
     try {
-      const { data: files, error } = await supabase.storage
-        .from('images')
-        .list('works', { limit: 1000, sortBy: { column: 'created_at', order: 'desc' } })
-      if (error) throw error
+      // 平行查作品圖片與教學記錄
+      const [worksRes, recordsRes] = await Promise.all([
+        supabase.from('works').select('id, image_url'),
+        supabase.from('teaching_records').select('photos')
+      ])
+      if (worksRes.error) throw worksRes.error
 
-      const totalSize = files.reduce((sum, file) => sum + (file.metadata?.size || 0), 0)
+      let totalBytes = 0
+      let photoCount = 0
+      const worksCount = worksRes.data?.length || 0
+
+      // 計算每張作品主圖的大小（base64 或 URL 都算）
+      for (const w of worksRes.data || []) {
+        if (w.image_url) {
+          if (w.image_url.startsWith('data:')) {
+            // base64：字串長度 * 0.75 ≈ 實際 bytes
+            totalBytes += Math.round(w.image_url.length * 0.75)
+          } else if (w.image_url.startsWith('http')) {
+            // Storage URL：估算平均 200KB
+            totalBytes += 200 * 1024
+          }
+          photoCount++
+        }
+      }
+
+      // 教學現場照片
+      for (const r of recordsRes.data || []) {
+        for (const p of r.photos || []) {
+          if (p?.startsWith('data:')) {
+            totalBytes += Math.round(p.length * 0.75)
+          } else if (p?.startsWith('http')) {
+            totalBytes += 200 * 1024
+          }
+          photoCount++
+        }
+      }
+
       const limitBytes = 500 * 1024 * 1024
-      const usedMB = (totalSize / (1024 * 1024)).toFixed(2)
-      const limitMB = 500
-      const usedPercent = ((totalSize / limitBytes) * 100).toFixed(1)
+      const usedMB = (totalBytes / (1024 * 1024)).toFixed(2)
+      const usedPercent = ((totalBytes / limitBytes) * 100).toFixed(1)
 
       return {
-        totalSize, usedMB, limitMB, usedPercent,
-        remainingMB: (limitMB - usedMB).toFixed(2),
-        fileCount: files.length
+        totalSize: totalBytes,
+        usedMB,
+        limitMB: 500,
+        usedPercent,
+        remainingMB: Math.max(0, 500 - parseFloat(usedMB)).toFixed(2),
+        photoCount,
+        worksCount
       }
     } catch (error) {
       console.error('取得容量失敗:', error)
@@ -259,7 +306,7 @@ export const systemAPI = {
     ])
 
     return {
-      version: '2.2',
+      version: '2.3',
       timestamp: new Date().toISOString(),
       data: {
         works: works.data || [],
@@ -293,11 +340,9 @@ export const systemAPI = {
 
   async restoreBackup(backup) {
     if (!backup.data) throw new Error('無效的備份檔案')
-
     const results = { locations: 0, seniors: 0, works: 0, records: 0, filters: 0 }
 
     try {
-      // 依序清除（因為外鍵依賴）
       await supabase.from('teaching_seniors').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       await supabase.from('teaching_records').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       await supabase.from('seniors').delete().neq('id', '00000000-0000-0000-0000-000000000000')
@@ -305,7 +350,6 @@ export const systemAPI = {
       await supabase.from('locations').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       await supabase.from('filter_options').delete().neq('id', '00000000-0000-0000-0000-000000000000')
 
-      // 1. 還原中心
       if (backup.data.locations?.length > 0) {
         const { error } = await supabase.from('locations').insert(
           backup.data.locations.map(l => ({ id: l.id, name: l.name, address: l.address || '', created_at: l.created_at }))
@@ -313,8 +357,6 @@ export const systemAPI = {
         if (error) throw new Error('還原中心失敗: ' + error.message)
         results.locations = backup.data.locations.length
       }
-
-      // 2. 還原長輩
       if (backup.data.seniors?.length > 0) {
         const { error } = await supabase.from('seniors').insert(
           backup.data.seniors.map(s => ({ id: s.id, name: s.name, location_id: s.location_id, notes: s.notes || '', created_at: s.created_at }))
@@ -322,8 +364,6 @@ export const systemAPI = {
         if (error) throw new Error('還原長輩失敗: ' + error.message)
         results.seniors = backup.data.seniors.length
       }
-
-      // 3. 還原作品
       if (backup.data.works?.length > 0) {
         const { error } = await supabase.from('works').insert(
           backup.data.works.map(w => ({
@@ -335,20 +375,17 @@ export const systemAPI = {
         if (error) throw new Error('還原作品失敗: ' + error.message)
         results.works = backup.data.works.length
       }
-
-      // 4. 還原教學記錄
       if (backup.data.teaching_records?.length > 0) {
         const { error } = await supabase.from('teaching_records').insert(
           backup.data.teaching_records.map(r => ({
             id: r.id, work_id: r.work_id, location_id: r.location_id,
-            teaching_date: r.teaching_date, notes: r.notes || '', created_at: r.created_at
+            teaching_date: r.teaching_date, notes: r.notes || '',
+            photos: r.photos || [], created_at: r.created_at
           }))
         )
         if (error) throw new Error('還原教學記錄失敗: ' + error.message)
         results.records = backup.data.teaching_records.length
       }
-
-      // 5. 還原教學長輩記錄
       if (backup.data.teaching_seniors?.length > 0) {
         const { error } = await supabase.from('teaching_seniors').insert(
           backup.data.teaching_seniors.map(ts => ({
@@ -358,8 +395,6 @@ export const systemAPI = {
         )
         if (error) console.warn('部分教學長輩記錄還原失敗:', error.message)
       }
-
-      // 6. 還原篩選條件
       if (backup.data.filter_options?.length > 0) {
         const { error } = await supabase.from('filter_options').insert(
           backup.data.filter_options.map(f => ({
@@ -371,10 +406,8 @@ export const systemAPI = {
         if (error) throw new Error('還原篩選條件失敗: ' + error.message)
         results.filters = backup.data.filter_options.length
       }
-
       return results
     } catch (error) {
-      console.error('還原失敗:', error)
       throw error
     }
   }
@@ -383,37 +416,54 @@ export const systemAPI = {
 // ============================================
 // 6. 篩選條件管理 API
 // ============================================
+
+// 永遠可用的硬編碼預設值（資料庫空或失敗時 fallback）
+const DEFAULT_FILTER_OPTIONS = {
+  season: ['春', '夏', '秋', '冬', '不限'],
+  festival: ['無', '春節', '元宵', '清明', '端午', '中秋', '重陽', '聖誕'],
+  material_type: ['紙類', '黏土', '布料', '綜合媒材', '其他']
+}
+
 export const filterOptionsAPI = {
   async getAll() {
-    const { data, error } = await supabase
-      .from('filter_options')
-      .select('*')
-      .eq('is_active', true)
-      .order('display_order')
-    if (error) throw error
-    
-    const grouped = { season: [], festival: [], material_type: [] }
-    data.forEach(option => {
-      if (grouped[option.category]) grouped[option.category].push(option.value)
-    })
-    return grouped
-  },
+    try {
+      const { data, error } = await supabase
+        .from('filter_options')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order')
 
-  async getByCategory(category) {
-    const { data, error } = await supabase
-      .from('filter_options')
-      .select('*')
-      .eq('category', category)
-      .eq('is_active', true)
-      .order('display_order')
-    if (error) throw error
-    return data.map(option => option.value)
+      // 資料庫錯誤或 RLS 阻擋 → 回傳預設值
+      if (error) {
+        console.warn('filter_options 查詢失敗，使用預設值:', error.message)
+        return { ...DEFAULT_FILTER_OPTIONS }
+      }
+
+      const grouped = { season: [], festival: [], material_type: [] }
+      data.forEach(option => {
+        if (grouped[option.category] !== undefined) {
+          grouped[option.category].push(option.value)
+        }
+      })
+
+      // 資料庫是空的 → 回傳預設值（不嘗試寫入，避免 UNIQUE 衝突）
+      const hasData = Object.values(grouped).some(arr => arr.length > 0)
+      if (!hasData) {
+        console.info('filter_options 資料表是空的，使用預設值')
+        return { ...DEFAULT_FILTER_OPTIONS }
+      }
+
+      return grouped
+    } catch (err) {
+      console.warn('filterOptionsAPI.getAll 例外，使用預設值:', err.message)
+      return { ...DEFAULT_FILTER_OPTIONS }
+    }
   },
 
   async create(category, value, displayOrder = 999) {
     const { data, error } = await supabase
       .from('filter_options')
-      .insert([{ category, value, display_order: displayOrder }])
+      .insert([{ category, value, display_order: displayOrder, is_active: true }])
       .select()
     if (error) throw error
     return data[0]
