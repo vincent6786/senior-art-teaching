@@ -10,13 +10,10 @@ import './App.css'
 function App() {
   const [currentLocation, setCurrentLocation] = useState(null)
   const [darkMode, setDarkMode] = useState(() => {
-    // 從 localStorage 讀取 dark mode 偏好
     const saved = localStorage.getItem('darkMode')
     return saved === 'true' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)
   })
-  const [customLogo, setCustomLogo] = useState(null)
 
-  // 監聽 dark mode 變化，更新 localStorage 和 class
   useEffect(() => {
     localStorage.setItem('darkMode', darkMode)
     if (darkMode) {
@@ -26,12 +23,6 @@ function App() {
     }
   }, [darkMode])
 
-  // 載入自訂 Logo
-  useEffect(() => {
-    const logo = localStorage.getItem('customLogo')
-    setCustomLogo(logo)
-  }, [])
-
   return (
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
@@ -40,25 +31,15 @@ function App() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <Link to="/" className="flex items-center gap-3 hover:scale-105 transition-transform">
-                {customLogo ? (
-                  <img
-                    src={customLogo}
-                    alt="Logo"
-                    className="h-10 w-10 object-contain"
-                  />
-                ) : (
-                  <span className="text-3xl">🎨</span>
-                )}
+                <span className="text-3xl">🎨</span>
                 <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
                   教學管理
                 </span>
               </Link>
               
-              {/* 中心選擇器 */}
               <LocationSelector 
                 currentLocation={currentLocation}
                 onLocationChange={setCurrentLocation}
-                darkMode={darkMode}
               />
             </div>
           </div>
@@ -67,42 +48,26 @@ function App() {
         {/* 主要內容區 */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Routes>
-            <Route 
-              path="/" 
-              element={<WorksGallery currentLocation={currentLocation} />} 
-            />
-            <Route 
-              path="/upload" 
-              element={<UploadWork />} 
-            />
-            <Route 
-              path="/record/:workId" 
-              element={<TeachingRecord currentLocation={currentLocation} />} 
-            />
-            <Route 
-              path="/work/:workId" 
-              element={<WorkDetail currentLocation={currentLocation} />} 
-            />
-            <Route 
-              path="/settings" 
-              element={<Settings darkMode={darkMode} setDarkMode={setDarkMode} />} 
-            />
+            <Route path="/" element={<WorksGallery currentLocation={currentLocation} />} />
+            <Route path="/upload" element={<UploadWork />} />
+            <Route path="/record/:workId" element={<TeachingRecord currentLocation={currentLocation} />} />
+            <Route path="/work/:workId" element={<WorkDetail currentLocation={currentLocation} />} />
+            <Route path="/settings" element={<Settings darkMode={darkMode} setDarkMode={setDarkMode} />} />
           </Routes>
         </main>
 
-        {/* 底部快捷選單 */}
         <BottomNav />
+        <ScrollToTopButton />
       </div>
     </Router>
   )
 }
 
 // 中心選擇器元件
-function LocationSelector({ currentLocation, onLocationChange, darkMode }) {
+function LocationSelector({ currentLocation, onLocationChange }) {
   const [locations, setLocations] = useState([])
   const [isOpen, setIsOpen] = useState(false)
 
-  // 載入中心列表
   useEffect(() => {
     import('./lib/supabase').then(({ locationsAPI }) => {
       locationsAPI.getAll().then(setLocations)
@@ -122,13 +87,7 @@ function LocationSelector({ currentLocation, onLocationChange, darkMode }) {
 
       {isOpen && (
         <>
-          {/* 背景遮罩 */}
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)}
-          />
-          
-          {/* 下拉選單 */}
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
           <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-2xl py-2 z-50 border border-gray-200 dark:border-gray-700 animate-fadeIn">
             <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 font-medium">
               選擇活動中心
@@ -174,7 +133,7 @@ function LocationSelector({ currentLocation, onLocationChange, darkMode }) {
   )
 }
 
-// 底部導覽列
+// 底部導覽列 - 3 個按鈕
 function BottomNav() {
   const location = useLocation()
   
@@ -186,20 +145,40 @@ function BottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-t border-gray-200 dark:border-gray-700 shadow-lg z-50">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="grid grid-cols-4 gap-2 py-2">
+        <div className="grid grid-cols-3 gap-2 py-2">
           <NavItem to="/" icon="🖼️" label="作品庫" active={isActive('/')} />
           <NavItem to="/upload" icon="📸" label="上傳" active={isActive('/upload')} />
           <NavItem to="/settings" icon="⚙️" label="設定" active={isActive('/settings')} />
-          <button 
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="nav-item"
-          >
-            <span className="text-2xl">⬆️</span>
-            <span className="text-xs mt-1">回頂部</span>
-          </button>
         </div>
       </div>
     </nav>
+  )
+}
+
+// 浮動回頂部按鈕 - 滾動時出現
+function ScrollToTopButton() {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setVisible(window.scrollY > 300)
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  if (!visible) return null
+
+  return (
+    <button
+      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      className="fixed bottom-20 right-4 z-50 w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center animate-fadeIn"
+      aria-label="回到頂部"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+      </svg>
+    </button>
   )
 }
 
