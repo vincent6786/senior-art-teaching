@@ -126,9 +126,9 @@ CREATE TRIGGER update_works_updated_at BEFORE UPDATE ON works
 
 -- 插入測試中心
 INSERT INTO locations (name, address) VALUES 
-    ('松山老人活動中心', '台北市松山區'),
-    ('大安社區關懷據點', '台北市大安區'),
-    ('南港樂齡中心', '台北市南港區');
+    ('文山樂齡中心', '聯新平鎮'),
+    ('聯新中壢', '聯新復旦'),
+    ('三峽中埔', '佳醫中壢');
 
 -- 插入測試長輩
 INSERT INTO seniors (name, location_id, notes) 
