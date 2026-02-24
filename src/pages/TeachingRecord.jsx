@@ -3,13 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { worksAPI, teachingRecordsAPI } from '../lib/supabase'
 import { format } from 'date-fns'
 
-function compressImage(file) {
-  return new Promise((resolve, reject) => {
+const CLOUD_NAME = 'dbq5zvmwv'
+const UPLOAD_PRESET = 'vetwuqsc'
+
+// 上傳現場照片到 Cloudinary（不佔 Supabase 空間）
+async function uploadFieldPhoto(file) {
+  // 先壓縮再上傳
+  const blob = await new Promise((resolve, reject) => {
     const img = new Image()
     const reader = new FileReader()
     reader.onload = (e) => {
       img.onload = () => {
-        const maxSize = 600
+        const maxSize = 800
         let { width, height } = img
         if (width > maxSize || height > maxSize) {
           if (width > height) { height = Math.round(height * maxSize / width); width = maxSize }
@@ -18,7 +23,7 @@ function compressImage(file) {
         const canvas = document.createElement('canvas')
         canvas.width = width; canvas.height = height
         canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', 0.7))
+        canvas.toBlob(resolve, 'image/jpeg', 0.78)
       }
       img.onerror = reject
       img.src = e.target.result
@@ -26,6 +31,19 @@ function compressImage(file) {
     reader.onerror = reject
     reader.readAsDataURL(file)
   })
+
+  const formData = new FormData()
+  formData.append('file', blob, 'field-photo.jpg')
+  formData.append('upload_preset', UPLOAD_PRESET)
+  formData.append('folder', 'senior-art/field-photos')
+
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+    { method: 'POST', body: formData }
+  )
+  const data = await res.json()
+  if (data.error) throw new Error('照片上傳失敗：' + data.error.message)
+  return data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/')
 }
 
 function TeachingRecord({ currentLocation, allSeniors = [] }) {
@@ -52,9 +70,12 @@ function TeachingRecord({ currentLocation, allSeniors = [] }) {
     if (remaining <= 0) return
     setCompressing(true)
     try {
-      const compressed = await Promise.all(files.slice(0, remaining).map(compressImage))
-      setPhotos(prev => [...prev, ...compressed])
-    } catch (err) { alert('照片處理失敗：' + err.message) }
+      // 上傳到 Cloudinary，回傳網址
+      const urls = await Promise.all(
+        files.slice(0, remaining).map(uploadFieldPhoto)
+      )
+      setPhotos(prev => [...prev, ...urls])
+    } catch (err) { alert('照片上傳失敗：' + err.message) }
     finally { setCompressing(false) }
     e.target.value = ''
   }
@@ -151,7 +172,7 @@ function TeachingRecord({ currentLocation, allSeniors = [] }) {
                 compressing ? 'border-indigo-300 bg-indigo-50 dark:bg-indigo-900/20' : 'border-gray-300 dark:border-gray-600 hover:border-indigo-400 bg-gray-50 dark:bg-gray-700/50'
               }`}>
                 {compressing ? (
-                  <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500 mb-1"></div><span className="text-xs text-indigo-500">處理中</span></>
+                  <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500 mb-1"></div><span className="text-xs text-indigo-500">上傳中</span></>
                 ) : (
                   <><span className="text-2xl mb-1">📸</span><span className="text-xs text-gray-500 dark:text-gray-400">新增照片</span></>
                 )}

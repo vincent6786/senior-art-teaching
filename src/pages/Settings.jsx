@@ -674,11 +674,20 @@ function ManualTab() {
 
       {/* 儲存空間 */}
       <ManualSection icon="💾" title="儲存空間說明">
-        <p>系統使用 Supabase 免費方案，資料庫儲存上限為 <strong className="text-gray-900 dark:text-white">500 MB</strong>。</p>
-        <p>作品照片與現場照片都以壓縮後的 base64 格式存在資料庫中，每張約 0.3–0.5 MB。</p>
-        <p>在「系統管理」分頁可查看目前使用量、剩餘空間、照片總數。</p>
-        <Tip icon="⚠️" text="使用量超過 80% 時系統會出現警告，建議刪除不需要的舊作品或教學照片釋放空間。" />
-        <Tip text="若空間不足，也可以升級 Supabase 方案以獲得更多儲存空間。" />
+        <p>系統使用<strong className="text-gray-900 dark:text-white">雙儲存架構</strong>，新舊照片分開存放：</p>
+        <div className="space-y-2 mt-1">
+          <div className="p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+            <p className="font-medium text-orange-800 dark:text-orange-300">🗄️ 舊照片 → Supabase 資料庫</p>
+            <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">換成 Cloudinary 之前上傳的作品照片，以 base64 格式存在資料庫，每張約 0.3–0.5 MB。Supabase 免費上限 500 MB。</p>
+          </div>
+          <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
+            <p className="font-medium text-indigo-800 dark:text-indigo-300">☁️ 新照片 → Cloudinary 雲端</p>
+            <p className="text-xs text-indigo-700 dark:text-indigo-400 mt-1">之後上傳的作品照片與現場照片，都自動存到 Cloudinary，完全不佔 Supabase 空間。免費額度高達 25 GB，足夠使用多年。</p>
+          </div>
+        </div>
+        <p className="mt-2">在「系統管理」分頁可查看兩個儲存空間的使用狀況，包含舊照片張數、新照片張數、Supabase 剩餘空間。</p>
+        <Tip icon="⚠️" text="Supabase 使用量超過 80% 時系統會出現警告。這只影響舊照片——新上傳的照片已存 Cloudinary，不會再增加 Supabase 用量。" />
+        <Tip text="手機離線時，看過的照片（新舊都有）會自動快取在手機裡，下次不需要網路也能瀏覽。" />
       </ManualSection>
 
       {/* 常見問題 */}
