@@ -68,14 +68,41 @@ export const worksAPI = {
     return true
   },
 
-  async uploadImage(file, workId) {
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${workId}-${Date.now()}.${fileExt}`
-    const filePath = `works/${fileName}`
-    const { error: uploadError } = await supabase.storage.from('images').upload(filePath, file)
-    if (uploadError) throw uploadError
-    const { data } = supabase.storage.from('images').getPublicUrl(filePath)
-    return data.publicUrl
+  // 壓縮圖片並回傳 base64（不使用 Storage，省容量）
+  async uploadImage(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      const reader = new FileReader()
+      
+      reader.onload = (e) => {
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          // 限制最大寬度 800px，保持比例
+          const maxSize = 800
+          let { width, height } = img
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = Math.round(height * maxSize / width)
+              width = maxSize
+            } else {
+              width = Math.round(width * maxSize / height)
+              height = maxSize
+            }
+          }
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, width, height)
+          // JPEG 品質 0.75，約 50~100KB
+          const base64 = canvas.toDataURL('image/jpeg', 0.75)
+          resolve(base64)
+        }
+        img.onerror = reject
+        img.src = e.target.result
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
   },
 
   async getLocationHistory(workId, locationId) {
@@ -375,19 +402,54 @@ export const systemAPI = {
 // 6. 篩選條件管理 API
 // ============================================
 export const filterOptionsAPI = {
+  // 預設選項（當資料表是空的時使用）
+  defaults: {
+    season: ['春', '夏', '秋', '冬', '不限'],
+    festival: ['無', '春節', '元宵', '清明', '端午', '中秋', '重陽', '聖誕'],
+    material_type: ['紙類', '黏土', '布料', '綜合媒材', '其他']
+  },
+
   async getAll() {
-    const { data, error } = await supabase
-      .from('filter_options')
-      .select('*')
-      .eq('is_active', true)
-      .order('display_order')
-    if (error) throw error
-    
-    const grouped = { season: [], festival: [], material_type: [] }
-    data.forEach(option => {
-      if (grouped[option.category]) grouped[option.category].push(option.value)
-    })
-    return grouped
+    try {
+      const { data, error } = await supabase
+        .from('filter_options')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order')
+      if (error) throw error
+      
+      const grouped = { season: [], festival: [], material_type: [] }
+      data.forEach(option => {
+        if (grouped[option.category]) grouped[option.category].push(option.value)
+      })
+      
+      // 如果資料表是空的，回傳預設值並自動寫入
+      const isEmpty = Object.values(grouped).every(arr => arr.length === 0)
+      if (isEmpty) {
+        console.info('filter_options 是空的，使用預設值')
+        await this.seedDefaults()
+        return { ...this.defaults }
+      }
+      return grouped
+    } catch (error) {
+      console.warn('載入篩選條件失敗，使用預設值:', error.message)
+      return { ...this.defaults }
+    }
+  },
+
+  async seedDefaults() {
+    try {
+      const records = []
+      let order = 0
+      for (const [category, values] of Object.entries(this.defaults)) {
+        for (const value of values) {
+          records.push({ category, value, display_order: order++, is_active: true })
+        }
+      }
+      await supabase.from('filter_options').insert(records)
+    } catch (e) {
+      console.warn('自動填入預設篩選條件失敗:', e.message)
+    }
   },
 
   async getByCategory(category) {
