@@ -1,12 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { worksAPI } from '../lib/supabase'
+import { worksAPI, filterOptionsAPI } from '../lib/supabase'
 
 function UploadWork() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [imagePreview, setImagePreview] = useState(null)
   const [imageFile, setImageFile] = useState(null)
+  const [filterOptions, setFilterOptions] = useState({
+    season: [],
+    festival: [],
+    material_type: []
+  })
   
   const [formData, setFormData] = useState({
     title: '',
@@ -15,6 +20,11 @@ function UploadWork() {
     material_type: '',
     description: ''
   })
+
+  // 載入篩選選項
+  useEffect(() => {
+    filterOptionsAPI.getAll().then(setFilterOptions)
+  }, [])
 
   // 處理圖片選擇
   const handleImageChange = (e) => {
@@ -88,12 +98,12 @@ function UploadWork() {
 
   return (
     <div className="max-w-2xl mx-auto pb-24">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">上傳新作品</h1>
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">上傳新作品</h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 圖片上傳區 */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
             作品照片 *
           </label>
 
@@ -118,9 +128,9 @@ function UploadWork() {
           ) : (
             <div className="space-y-3">
               {/* 拍照按鈕（手機會開啟相機）*/}
-              <label className="block w-full py-8 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:border-indigo-500 transition-colors">
+              <label className="block w-full py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-center cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-400 transition-colors bg-gray-50 dark:bg-gray-700/50">
                 <span className="text-4xl mb-2 block">📸</span>
-                <span className="text-gray-600">點擊拍照</span>
+                <span className="text-gray-600 dark:text-gray-300">點擊拍照</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -131,8 +141,8 @@ function UploadWork() {
               </label>
 
               {/* 或是從相簿選擇 */}
-              <label className="block w-full py-4 bg-gray-100 rounded-lg text-center cursor-pointer hover:bg-gray-200 transition-colors">
-                <span className="text-gray-700">或從相簿選擇</span>
+              <label className="block w-full py-4 bg-gray-100 dark:bg-gray-700 rounded-lg text-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                <span className="text-gray-700 dark:text-gray-300">或從相簿選擇</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -145,12 +155,12 @@ function UploadWork() {
         </div>
 
         {/* 基本資訊 */}
-        <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-          <h3 className="font-semibold text-gray-900 mb-4">作品資訊</h3>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 space-y-4 border border-gray-200 dark:border-gray-700">
+          <h3 className="font-semibold text-gray-900 dark:text-white mb-4">作品資訊</h3>
 
           {/* 作品名稱 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               作品名稱 *
             </label>
             <input
@@ -159,26 +169,26 @@ function UploadWork() {
               value={formData.title}
               onChange={handleChange}
               placeholder="例如：春天櫻花剪貼畫"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               required
             />
           </div>
 
           {/* 季節 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               適合季節
             </label>
             <div className="flex flex-wrap gap-2">
-              {['春', '夏', '秋', '冬', '不限'].map(season => (
+              {(filterOptions.season.length > 0 ? filterOptions.season : ['春', '夏', '秋', '冬', '不限']).map(season => (
                 <button
                   key={season}
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, season }))}
-                  className={`px-4 py-2 rounded-lg ${
+                  className={`px-4 py-2 rounded-lg transition-all duration-200 ${
                     formData.season === season
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
                   {season}
@@ -189,40 +199,37 @@ function UploadWork() {
 
           {/* 節日 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               相關節日
             </label>
             <select
               name="festival"
               value={formData.festival}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
             >
               <option value="無">無特定節日</option>
-              <option value="春節">春節</option>
-              <option value="元宵">元宵</option>
-              <option value="清明">清明</option>
-              <option value="端午">端午</option>
-              <option value="中秋">中秋</option>
-              <option value="重陽">重陽</option>
+              {(filterOptions.festival.length > 0 ? filterOptions.festival : ['春節', '元宵', '清明', '端午', '中秋', '重陽']).filter(f => f !== '無').map(festival => (
+                <option key={festival} value={festival}>{festival}</option>
+              ))}
             </select>
           </div>
 
           {/* 材料類型 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               使用材料
             </label>
             <div className="flex flex-wrap gap-2">
-              {['紙類', '黏土', '布料', '綜合媒材', '其他'].map(material => (
+              {(filterOptions.material_type.length > 0 ? filterOptions.material_type : ['紙類', '黏土', '布料', '綜合媒材', '其他']).map(material => (
                 <button
                   key={material}
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, material_type: material }))}
-                  className={`px-4 py-2 rounded-lg ${
+                  className={`px-4 py-2 rounded-lg transition-all duration-200 ${
                     formData.material_type === material
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
                   {material}
@@ -233,7 +240,7 @@ function UploadWork() {
 
           {/* 作品描述 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               作品描述（選填）
             </label>
             <textarea
@@ -242,7 +249,7 @@ function UploadWork() {
               onChange={handleChange}
               placeholder="例如：使用色紙剪出櫻花並貼在卡紙上，適合春天主題活動"
               rows="3"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500"
             />
           </div>
         </div>
@@ -252,14 +259,14 @@ function UploadWork() {
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            className="flex-1 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             取消
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? '上傳中...' : '上傳作品'}
           </button>

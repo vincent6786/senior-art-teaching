@@ -106,8 +106,8 @@ function TeachingRecord({ currentLocation }) {
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-        <p className="mt-4 text-gray-600">載入中...</p>
+        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
+        <p className="mt-4 text-gray-600 dark:text-gray-400">載入中...</p>
       </div>
     )
   }
@@ -115,12 +115,12 @@ function TeachingRecord({ currentLocation }) {
   if (!currentLocation) {
     return (
       <div className="max-w-2xl mx-auto">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6 text-center">
           <span className="text-4xl mb-3 block">⚠️</span>
-          <h3 className="text-lg font-semibold text-yellow-900 mb-2">
+          <h3 className="text-lg font-semibold text-yellow-900 dark:text-yellow-200 mb-2">
             請先選擇活動中心
           </h3>
-          <p className="text-yellow-700">
+          <p className="text-yellow-700 dark:text-yellow-400">
             請在頁面上方選擇你要記錄的活動中心
           </p>
         </div>
@@ -130,29 +130,29 @@ function TeachingRecord({ currentLocation }) {
 
   return (
     <div className="max-w-2xl mx-auto pb-24">
-      <h1 className="text-3xl font-bold text-gray-900 mb-2">記錄教學</h1>
-      <p className="text-gray-600 mb-6">
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">記錄教學</h1>
+      <p className="text-gray-600 dark:text-gray-400 mb-6">
         在 {currentLocation.name} 教學
       </p>
 
       {/* 作品資訊卡片 */}
       {work && (
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6 flex gap-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6 flex gap-4 border border-gray-200 dark:border-gray-700">
           <img
             src={work.image_url}
             alt={work.title}
             className="w-24 h-24 object-cover rounded-lg"
           />
           <div className="flex-1">
-            <h3 className="font-semibold text-gray-900 mb-1">{work.title}</h3>
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{work.title}</h3>
             <div className="flex gap-2 flex-wrap">
               {work.season && (
-                <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
+                <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded">
                   {work.season}
                 </span>
               )}
               {work.material_type && (
-                <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
+                <span className="text-xs px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded">
                   {work.material_type}
                 </span>
               )}
@@ -163,27 +163,27 @@ function TeachingRecord({ currentLocation }) {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 教學日期 */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             教學日期
           </label>
           <input
             type="date"
             value={recordData.teaching_date}
             onChange={(e) => setRecordData(prev => ({ ...prev, teaching_date: e.target.value }))}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
         {/* 參與長輩選擇 */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+          <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
             參與長輩 ({participants.length} 位)
           </h3>
 
           {seniors.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">
-              此中心尚無長輩資料，請先新增長輩
+            <p className="text-gray-500 dark:text-gray-400 text-center py-4">
+              此中心尚無長輩資料，請先在設定中新增長輩
             </p>
           ) : (
             <div className="space-y-3">
@@ -192,7 +192,7 @@ function TeachingRecord({ currentLocation }) {
                 const participant = participants.find(p => p.senior_id === senior.id)
 
                 return (
-                  <div key={senior.id} className="border border-gray-200 rounded-lg p-4">
+                  <div key={senior.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700/50">
                     {/* 長輩選擇 */}
                     <label className="flex items-center cursor-pointer mb-3">
                       <input
@@ -201,17 +201,17 @@ function TeachingRecord({ currentLocation }) {
                         onChange={() => toggleSeniorParticipation(senior.id)}
                         className="w-5 h-5 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500"
                       />
-                      <span className="ml-3 font-medium text-gray-900">
+                      <span className="ml-3 font-medium text-gray-900 dark:text-white">
                         {senior.name}
                       </span>
                     </label>
 
                     {/* 展開的詳細資訊 */}
                     {isSelected && (
-                      <div className="ml-8 space-y-3 border-l-2 border-indigo-200 pl-4">
+                      <div className="ml-8 space-y-3 border-l-2 border-indigo-200 dark:border-indigo-700 pl-4">
                         {/* 完成狀態 */}
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-2">
+                          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
                             完成狀態
                           </label>
                           <div className="flex gap-2">
@@ -220,10 +220,10 @@ function TeachingRecord({ currentLocation }) {
                                 key={status}
                                 type="button"
                                 onClick={() => updateParticipant(senior.id, 'completion_status', status)}
-                                className={`px-3 py-1 rounded-lg text-sm ${
+                                className={`px-3 py-1 rounded-lg text-sm transition-all duration-200 ${
                                   participant.completion_status === status
-                                    ? 'bg-indigo-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md'
+                                    : 'bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-500'
                                 }`}
                               >
                                 {status}
@@ -234,7 +234,7 @@ function TeachingRecord({ currentLocation }) {
 
                         {/* 反應/備註 */}
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-2">
+                          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
                             反應與備註
                           </label>
                           <textarea
@@ -242,7 +242,7 @@ function TeachingRecord({ currentLocation }) {
                             onChange={(e) => updateParticipant(senior.id, 'reaction', e.target.value)}
                             placeholder="例如：很喜歡這個主題、手部動作較慢、需要額外協助等"
                             rows="2"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500"
                           />
                         </div>
                       </div>
@@ -255,8 +255,8 @@ function TeachingRecord({ currentLocation }) {
         </div>
 
         {/* 整體備註 */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             整體備註（選填）
           </label>
           <textarea
@@ -264,7 +264,7 @@ function TeachingRecord({ currentLocation }) {
             onChange={(e) => setRecordData(prev => ({ ...prev, notes: e.target.value }))}
             placeholder="例如：今天教學氣氛很好、部分長輩需要更多時間完成、建議下次準備更大的材料等"
             rows="3"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500"
           />
         </div>
 
@@ -273,14 +273,14 @@ function TeachingRecord({ currentLocation }) {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            className="flex-1 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             取消
           </button>
           <button
             type="submit"
             disabled={submitting || participants.length === 0}
-            className="flex-1 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? '儲存中...' : '儲存記錄'}
           </button>
