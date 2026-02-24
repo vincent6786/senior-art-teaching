@@ -361,12 +361,26 @@ function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage, teachi
             </div>
 
             {/* Cloudinary 說明 */}
-            <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300">☁️ Cloudinary 雲端儲存</p>
-                <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-0.5">共 {storageUsage.cloudinaryTotal} 張 · 不佔 Supabase 空間</p>
+            <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">☁️ Cloudinary 雲端儲存</span>
+                <span className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-3 py-1 rounded-full">25 GB 免費</span>
               </div>
-              <span className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-3 py-1 rounded-full">25 GB 免費</span>
+              <div className="flex justify-between text-xs text-indigo-600 dark:text-indigo-400 mb-1">
+                <span>約 {storageUsage.cloudinaryUsedMB} MB（估算）</span>
+                <span>{storageUsage.cloudinaryUsedPercent}%</span>
+              </div>
+              <div className="w-full bg-indigo-200 dark:bg-indigo-800 rounded-full h-2.5 overflow-hidden mb-2">
+                <div
+                  className="h-full rounded-full bg-indigo-500 dark:bg-indigo-400 transition-all duration-500"
+                  style={{ width: `${Math.min(Math.max(parseFloat(storageUsage.cloudinaryUsedPercent), 0.1), 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-indigo-500 dark:text-indigo-400">
+                <span>{storageUsage.cloudinaryTotal} 張照片</span>
+                <span>剩餘約 {storageUsage.cloudinaryRemainingGB} GB</span>
+              </div>
+              <p className="text-xs text-indigo-400 dark:text-indigo-500 mt-2">＊ 依固定壓縮規格計算（作品主圖 180 KB、現場照片 90 KB），精確數字可至 Cloudinary 後台查看</p>
             </div>
 
             {parseFloat(storageUsage.usedPercent) > 80 && (

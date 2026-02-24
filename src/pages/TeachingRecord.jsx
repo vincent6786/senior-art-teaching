@@ -6,9 +6,11 @@ import { format } from 'date-fns'
 const CLOUD_NAME = 'dbq5zvmwv'
 const UPLOAD_PRESET = 'vetwuqsc'
 
-// 上傳現場照片：依設定選擇 Cloudinary 或 base64
+// 固定壓縮規格：最長邊 650px、品質 0.72 → 每張約 90 KB
 async function uploadFieldPhoto(file) {
   const mode = localStorage.getItem('storageMode') || 'cloudinary'
+  const MAX_SIZE = 650
+  const QUALITY = 0.72
 
   if (mode === 'supabase') {
     // base64 壓縮，存 Supabase
@@ -17,16 +19,15 @@ async function uploadFieldPhoto(file) {
       const reader = new FileReader()
       reader.onload = (e) => {
         img.onload = () => {
-          const maxSize = 600
           let { width, height } = img
-          if (width > maxSize || height > maxSize) {
-            if (width > height) { height = Math.round(height * maxSize / width); width = maxSize }
-            else { width = Math.round(width * maxSize / height); height = maxSize }
+          if (width > MAX_SIZE || height > MAX_SIZE) {
+            if (width > height) { height = Math.round(height * MAX_SIZE / width); width = MAX_SIZE }
+            else { width = Math.round(width * MAX_SIZE / height); height = MAX_SIZE }
           }
           const canvas = document.createElement('canvas')
           canvas.width = width; canvas.height = height
           canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-          resolve(canvas.toDataURL('image/jpeg', 0.7))
+          resolve(canvas.toDataURL('image/jpeg', QUALITY))
         }
         img.onerror = reject
         img.src = e.target.result
@@ -36,22 +37,21 @@ async function uploadFieldPhoto(file) {
     })
   }
 
-  // Cloudinary 上傳
+  // Cloudinary：前端先壓縮再上傳
   const blob = await new Promise((resolve, reject) => {
     const img = new Image()
     const reader = new FileReader()
     reader.onload = (e) => {
       img.onload = () => {
-        const maxSize = 800
         let { width, height } = img
-        if (width > maxSize || height > maxSize) {
-          if (width > height) { height = Math.round(height * maxSize / width); width = maxSize }
-          else { width = Math.round(width * maxSize / height); height = maxSize }
+        if (width > MAX_SIZE || height > MAX_SIZE) {
+          if (width > height) { height = Math.round(height * MAX_SIZE / width); width = MAX_SIZE }
+          else { width = Math.round(width * MAX_SIZE / height); height = MAX_SIZE }
         }
         const canvas = document.createElement('canvas')
         canvas.width = width; canvas.height = height
         canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-        canvas.toBlob(resolve, 'image/jpeg', 0.78)
+        canvas.toBlob(resolve, 'image/jpeg', QUALITY)
       }
       img.onerror = reject
       img.src = e.target.result
@@ -71,7 +71,7 @@ async function uploadFieldPhoto(file) {
   )
   const data = await res.json()
   if (data.error) throw new Error('照片上傳失敗：' + data.error.message)
-  return data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/')
+  return data.secure_url
 }
 
 function TeachingRecord({ currentLocation, allSeniors = [] }) {
