@@ -27,15 +27,13 @@ function TeachingRecord({ currentLocation }) {
   const loadData = async () => {
     setLoading(true)
     try {
-      // 載入作品資訊
-      const workData = await worksAPI.getById(workId)
+      // 平行載入作品與長輩資料，加快速度
+      const [workData, seniorsData] = await Promise.all([
+        worksAPI.getById(workId),
+        currentLocation ? seniorsAPI.getByLocation(currentLocation.id) : Promise.resolve([])
+      ])
       setWork(workData)
-
-      // 載入該中心的長輩
-      if (currentLocation) {
-        const seniorsData = await seniorsAPI.getByLocation(currentLocation.id)
-        setSeniors(seniorsData)
-      }
+      setSeniors(seniorsData)
     } catch (error) {
       console.error('載入資料失敗:', error)
     } finally {
@@ -75,8 +73,8 @@ function TeachingRecord({ currentLocation }) {
       return
     }
 
-    if (participants.length === 0) {
-      alert('請至少選擇一位參與的長輩')
+    if (!recordData.teaching_date) {
+      alert('請選擇教學日期')
       return
     }
 
@@ -163,22 +161,23 @@ function TeachingRecord({ currentLocation }) {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 教學日期 */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-200 dark:border-gray-700">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            教學日期
+            📅 教學日期
           </label>
           <input
             type="date"
             value={recordData.teaching_date}
             onChange={(e) => setRecordData(prev => ({ ...prev, teaching_date: e.target.value }))}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+            className="w-full max-w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 box-border"
+            style={{ boxSizing: 'border-box' }}
           />
         </div>
 
         {/* 參與長輩選擇 */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
           <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
-            參與長輩 ({participants.length} 位)
+            參與長輩（選填）{participants.length > 0 && <span className="text-indigo-500 text-sm font-normal ml-2">已選 {participants.length} 位</span>}
           </h3>
 
           {seniors.length === 0 ? (
@@ -279,7 +278,7 @@ function TeachingRecord({ currentLocation }) {
           </button>
           <button
             type="submit"
-            disabled={submitting || participants.length === 0}
+            disabled={submitting}
             className="flex-1 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? '儲存中...' : '儲存記錄'}
