@@ -1,27 +1,22 @@
 import { useState, useEffect } from 'react'
 import { locationsAPI, seniorsAPI, filterOptionsAPI, systemAPI } from '../lib/supabase'
 
-function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp, filterOptions: filterOptionsProp, onLocationsUpdate, onSeniorsUpdate, onFilterOptionsUpdate }) {
+function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp = [], filterOptions: filterOptionsProp = { season: [], festival: [], material_type: [] }, onLocationsUpdate, onSeniorsUpdate, onFilterOptionsUpdate }) {
   const [activeTab, setActiveTab] = useState('system')
-  const [loading, setLoading] = useState(false)
   const [storageUsage, setStorageUsage] = useState(null)
   const [teachingDetailMode, setTeachingDetailMode] = useState(
     () => localStorage.getItem('teachingDetailMode') !== 'simple'
   )
-
-  // 用 prop 直接顯示，不再自己 fetch
-  const seniors = seniorsProp || []
-  const filterOptions = filterOptionsProp || { season: [], festival: [], material_type: [] }
 
   const [newLocation, setNewLocation] = useState({ name: '', address: '' })
   const [newSenior, setNewSenior] = useState({ name: '', location_id: '', notes: '' })
   const [newFilter, setNewFilter] = useState({ category: 'season', value: '' })
 
   useEffect(() => {
-    loadSystemStatus()
+    loadStorageStatus()
   }, [])
 
-  const loadSystemStatus = async () => {
+  const loadStorageStatus = async () => {
     try {
       const usage = await systemAPI.getStorageUsage()
       setStorageUsage(usage)
@@ -49,12 +44,9 @@ function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp, filt
   const handleRestore = async (e) => {
     const file = e.target.files[0]
     if (!file) return
-
     if (!confirm('⚠️ 還原備份會覆蓋現有資料，確定要繼續嗎？\n\n建議先備份目前的資料再還原。')) {
-      e.target.value = ''
-      return
+      e.target.value = ''; return
     }
-
     try {
       const text = await file.text()
       const backup = JSON.parse(text)
@@ -62,7 +54,7 @@ function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp, filt
       const result = await systemAPI.restoreBackup(backup)
       alert(`還原成功！\n作品：${result.works}\n中心：${result.locations}\n長輩：${result.seniors}\n教學記錄：${result.records}\n篩選條件：${result.filters}`)
       await Promise.all([onLocationsUpdate(), onSeniorsUpdate(), onFilterOptionsUpdate()])
-      await loadSystemStatus()
+      await loadStorageStatus()
     } catch (error) {
       alert('還原失敗：' + error.message)
     } finally {
@@ -138,20 +130,12 @@ function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp, filt
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
-      </div>
-    )
-  }
-
   return (
     <div className="max-w-4xl mx-auto pb-24">
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">系統設定</h1>
 
-      {/* Dark Mode */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6 border border-gray-200 dark:border-gray-700">
+      {/* 深色模式 */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-4 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">深色模式</h3>
@@ -169,7 +153,7 @@ function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp, filt
       </div>
 
       {/* 分頁 */}
-      <div className="flex gap-2 mb-6 overflow-x-auto scrollbar-hide pb-1">
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
         <TabButton active={activeTab === 'system'} onClick={() => setActiveTab('system')} icon="💾" label="系統管理" />
         <TabButton active={activeTab === 'locations'} onClick={() => setActiveTab('locations')} icon="🏢" label="活動中心" />
         <TabButton active={activeTab === 'seniors'} onClick={() => setActiveTab('seniors')} icon="👥" label="長輩管理" />
@@ -181,7 +165,7 @@ function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp, filt
           storageUsage={storageUsage}
           onBackup={handleBackup}
           onRestore={handleRestore}
-          onRefreshStorage={async () => { setStorageUsage(null); await loadSystemStatus() }}
+          onRefreshStorage={async () => { setStorageUsage(null); await loadStorageStatus() }}
           teachingDetailMode={teachingDetailMode}
           onTeachingDetailModeChange={handleTeachingDetailModeChange}
         />
@@ -198,7 +182,7 @@ function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp, filt
       )}
       {activeTab === 'seniors' && (
         <SeniorsTab
-          seniors={seniors}
+          seniors={seniorsProp}
           locations={locations}
           newSenior={newSenior}
           setNewSenior={setNewSenior}
@@ -207,7 +191,12 @@ function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp, filt
         />
       )}
       {activeTab === 'filters' && (
-        <FiltersTab filterOptions={filterOptions} newFilter={newFilter} setNewFilter={setNewFilter} onAdd={handleAddFilter} />
+        <FiltersTab
+          filterOptions={filterOptionsProp}
+          newFilter={newFilter}
+          setNewFilter={setNewFilter}
+          onAdd={handleAddFilter}
+        />
       )}
     </div>
   )
@@ -223,8 +212,7 @@ function TabButton({ active, onClick, icon, label }) {
           : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
       }`}
     >
-      <span>{icon}</span>
-      <span>{label}</span>
+      <span>{icon}</span><span>{label}</span>
     </button>
   )
 }
@@ -233,7 +221,6 @@ function TabButton({ active, onClick, icon, label }) {
 function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage, teachingDetailMode, onTeachingDetailModeChange }) {
   return (
     <div className="space-y-6">
-
       {/* 教學記錄模式 */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">教學記錄模式</h3>
@@ -274,7 +261,7 @@ function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage, teachi
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
                 <div className={`h-full rounded-full transition-all duration-500 ${parseFloat(storageUsage.usedPercent) > 80 ? 'bg-red-500' : parseFloat(storageUsage.usedPercent) > 60 ? 'bg-yellow-500' : 'bg-green-500'}`}
-                  style={{ width: `${Math.min(storageUsage.usedPercent, 100)}%` }} />
+                  style={{ width: `${Math.min(Math.max(parseFloat(storageUsage.usedPercent), 0.5), 100)}%` }} />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -284,11 +271,11 @@ function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage, teachi
               </div>
               <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">照片總數</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{storageUsage.fileCount}<span className="text-xs font-normal ml-0.5">張</span></p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{storageUsage.photoCount}<span className="text-xs font-normal ml-0.5">張</span></p>
               </div>
               <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">作品數</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{storageUsage.worksCount || 0}<span className="text-xs font-normal ml-0.5">件</span></p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{storageUsage.worksCount}<span className="text-xs font-normal ml-0.5">件</span></p>
               </div>
             </div>
             {parseFloat(storageUsage.usedPercent) > 80 && (
@@ -320,7 +307,7 @@ function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage, teachi
             📥 立即備份資料
           </button>
           <label className="block w-full">
-            <div className="w-full py-3 bg-white dark:bg-gray-700 border-2 border-dashed border-indigo-300 dark:border-indigo-600 hover:border-indigo-500 dark:hover:border-indigo-400 text-indigo-600 dark:text-indigo-400 rounded-lg font-medium transition-all duration-200 hover:scale-[1.02] cursor-pointer text-center">
+            <div className="w-full py-3 bg-white dark:bg-gray-700 border-2 border-dashed border-indigo-300 dark:border-indigo-600 hover:border-indigo-500 text-indigo-600 dark:text-indigo-400 rounded-lg font-medium cursor-pointer text-center">
               📤 從備份檔案還原
             </div>
             <input type="file" accept=".json" onChange={onRestore} className="hidden" />
@@ -331,59 +318,37 @@ function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage, teachi
           </div>
         </div>
       </div>
-
-      {/* 系統資訊 */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-          <span>ℹ️</span><span>系統資訊</span>
-        </h3>
-        <div className="space-y-2 text-sm">
-          {[['系統版本', 'v2.2'], ['資料庫', 'Supabase'], ['部署平台', 'Vercel'], ['免費儲存', '500 MB']].map(([label, value], i, arr) => (
-            <div key={label} className={`flex justify-between py-2 ${i < arr.length - 1 ? 'border-b border-gray-200 dark:border-gray-700' : ''}`}>
-              <span className="text-gray-600 dark:text-gray-400">{label}</span>
-              <span className="font-medium text-gray-900 dark:text-white">{value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   )
 }
 
-// === 活動中心管理 ===
+// === 活動中心 ===
 function LocationsTab({ locations, newLocation, setNewLocation, onAdd, onUpdate, onDelete }) {
   return (
     <div className="space-y-6">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">新增活動中心</h3>
         <form onSubmit={onAdd} className="space-y-4">
-          <input
-            type="text" placeholder="中心名稱 *" value={newLocation.name}
+          <input type="text" placeholder="中心名稱 *" value={newLocation.name}
             onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
             className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500"
-            required
-          />
-          <input
-            type="text" placeholder="地址（選填）" value={newLocation.address}
+            required />
+          <input type="text" placeholder="地址（選填）" value={newLocation.address}
             onChange={(e) => setNewLocation({ ...newLocation, address: e.target.value })}
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500"
-          />
+            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500" />
           <button type="submit" className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-lg font-medium transition-all duration-200 shadow-md">
             + 新增中心
           </button>
         </form>
       </div>
-
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          現有中心 ({locations.length})
-        </h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">中心列表 ({locations.length})</h3>
         {locations.length === 0 ? (
           <p className="text-gray-500 dark:text-gray-400 text-center py-8">尚無中心資料</p>
         ) : (
           <div className="space-y-3">
             {locations.map(loc => (
-              <LocationEditCard key={loc.id} location={loc} onUpdate={onUpdate} onDelete={onDelete} />
+              <LocationItem key={loc.id} location={loc} onUpdate={onUpdate} onDelete={onDelete} />
             ))}
           </div>
         )}
@@ -392,7 +357,7 @@ function LocationsTab({ locations, newLocation, setNewLocation, onAdd, onUpdate,
   )
 }
 
-function LocationEditCard({ location, onUpdate, onDelete }) {
+function LocationItem({ location, onUpdate, onDelete }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(location.name)
   const [editAddress, setEditAddress] = useState(location.address || '')
@@ -403,26 +368,18 @@ function LocationEditCard({ location, onUpdate, onDelete }) {
     setIsEditing(false)
   }
 
-  const handleCancel = () => {
-    setEditName(location.name)
-    setEditAddress(location.address || '')
-    setIsEditing(false)
-  }
-
   if (isEditing) {
     return (
       <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800 space-y-3">
         <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
           className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 text-sm"
-          placeholder="中心名稱" autoFocus
-        />
+          placeholder="中心名稱" autoFocus />
         <input type="text" value={editAddress} onChange={(e) => setEditAddress(e.target.value)}
           className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 text-sm"
-          placeholder="地址（選填）"
-        />
+          placeholder="地址（選填）" />
         <div className="flex gap-2">
           <button onClick={handleSave} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">✓ 儲存</button>
-          <button onClick={handleCancel} className="flex-1 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors">✕ 取消</button>
+          <button onClick={() => setIsEditing(false)} className="flex-1 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium">✕ 取消</button>
         </div>
       </div>
     )
@@ -435,12 +392,8 @@ function LocationEditCard({ location, onUpdate, onDelete }) {
         {location.address && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">{location.address}</p>}
       </div>
       <div className="flex gap-2 ml-3 shrink-0">
-        <button onClick={() => setIsEditing(true)} className="px-3 py-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors text-sm font-medium">
-          ✏️ 編輯
-        </button>
-        <button onClick={() => onDelete(location.id)} className="px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors text-sm font-medium">
-          🗑️
-        </button>
+        <button onClick={() => setIsEditing(true)} className="px-3 py-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors text-sm font-medium">✏️ 編輯</button>
+        <button onClick={() => onDelete(location.id)} className="px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors text-sm font-medium">🗑️</button>
       </div>
     </div>
   )
@@ -456,29 +409,23 @@ function SeniorsTab({ seniors, locations, newSenior, setNewSenior, onAdd, onDele
           <input type="text" placeholder="長輩姓名 *" value={newSenior.name}
             onChange={(e) => setNewSenior({ ...newSenior, name: e.target.value })}
             className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500"
-            required
-          />
+            required />
           <select value={newSenior.location_id}
             onChange={(e) => setNewSenior({ ...newSenior, location_id: e.target.value })}
             className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-            required
-          >
+            required>
             <option value="">選擇所屬中心 *</option>
-            {locations.map(loc => (
-              <option key={loc.id} value={loc.id}>{loc.name}</option>
-            ))}
+            {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
           </select>
           <textarea placeholder="備註（選填）" value={newSenior.notes}
             onChange={(e) => setNewSenior({ ...newSenior, notes: e.target.value })}
             rows="2"
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500"
-          />
+            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500" />
           <button type="submit" className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-lg font-medium transition-all duration-200 shadow-md">
             + 新增長輩
           </button>
         </form>
       </div>
-
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">長輩列表 ({seniors.length})</h3>
         {seniors.length === 0 ? (
@@ -489,7 +436,7 @@ function SeniorsTab({ seniors, locations, newSenior, setNewSenior, onAdd, onDele
               <div key={senior.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-xl">
                 <div className="min-w-0 flex-1">
                   <h4 className="font-medium text-gray-900 dark:text-white">{senior.name}</h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{senior.location_name}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{senior.location_name}</p>
                   {senior.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 truncate">{senior.notes}</p>}
                 </div>
                 <button onClick={() => onDelete(senior.id)} className="px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors ml-3 shrink-0 text-sm font-medium">
@@ -514,8 +461,7 @@ function FiltersTab({ filterOptions, newFilter, setNewFilter, onAdd }) {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">新增篩選選項</h3>
         <form onSubmit={onAdd} className="space-y-4">
           <select value={newFilter.category} onChange={(e) => setNewFilter({ ...newFilter, category: e.target.value })}
-            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
-          >
+            className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500">
             <option value="season">季節</option>
             <option value="festival">節日</option>
             <option value="material_type">材料類型</option>
@@ -523,8 +469,7 @@ function FiltersTab({ filterOptions, newFilter, setNewFilter, onAdd }) {
           <input type="text" placeholder="選項名稱 *" value={newFilter.value}
             onChange={(e) => setNewFilter({ ...newFilter, value: e.target.value })}
             className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500"
-            required
-          />
+            required />
           <button type="submit" className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-lg font-medium transition-all duration-200 shadow-md">
             + 新增選項
           </button>
@@ -534,11 +479,15 @@ function FiltersTab({ filterOptions, newFilter, setNewFilter, onAdd }) {
       {Object.entries(filterOptions).map(([category, values]) => (
         <div key={category} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{categoryLabels[category]}</h3>
-          <div className="flex flex-wrap gap-2">
-            {values.map((value, idx) => (
-              <span key={idx} className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-medium">{value}</span>
-            ))}
-          </div>
+          {values.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-gray-500 italic">（無選項）</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {values.map((value, idx) => (
+                <span key={idx} className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-medium">{value}</span>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>

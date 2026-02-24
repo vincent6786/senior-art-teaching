@@ -181,7 +181,19 @@ function TeachingRecordCard({ record, onDelete }) {
       {/* 詳細資訊 */}
       {isExpanded && (
         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600 space-y-4">
-          {/* 整體備註 */}
+          {/* 現場照片 */}
+          {record.photos && record.photos.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">📷 現場照片</h4>
+              <div className="flex gap-2 flex-wrap">
+                {record.photos.map((photo, idx) => (
+                  <img key={idx} src={photo} alt={`現場照片 ${idx + 1}`}
+                    className="w-24 h-24 object-cover rounded-lg border border-gray-200 dark:border-gray-600"
+                  />
+                ))}
+              </div>
+            </div>
+          )}
           {record.notes && (
             <div>
               <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">整體備註</h4>

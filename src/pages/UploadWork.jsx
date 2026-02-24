@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { worksAPI } from '../lib/supabase'
 
-function UploadWork({ filterOptions }) {
+function UploadWork({ filterOptions = { season: [], festival: [], material_type: [] } }) {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [imagePreview, setImagePreview] = useState(null)
@@ -15,6 +15,7 @@ function UploadWork({ filterOptions }) {
     material_type: '',
     description: ''
   })
+
 
   // 處理圖片選擇
   const handleImageChange = (e) => {
