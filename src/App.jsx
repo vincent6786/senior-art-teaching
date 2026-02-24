@@ -20,11 +20,7 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem('darkMode', darkMode)
-    if (darkMode) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
+    document.documentElement.classList.toggle('dark', darkMode)
   }, [darkMode])
 
   const refreshLocations = useCallback(async () => {
@@ -60,10 +56,10 @@ function App() {
     }
   }, [])
 
-  // 啟動時平行載入所有全域資料
+  // 啟動時平行載入全部全域資料
   useEffect(() => {
     Promise.all([refreshLocations(), refreshFilterOptions(), refreshSeniors()])
-  }, [refreshLocations, refreshFilterOptions, refreshSeniors])
+  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Router>
@@ -78,8 +74,8 @@ function App() {
                   教學管理
                 </span>
               </Link>
-              
-              <LocationSelector 
+
+              <LocationSelector
                 locations={locations}
                 currentLocation={currentLocation}
                 onLocationChange={setCurrentLocation}
@@ -91,25 +87,36 @@ function App() {
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Routes>
-            <Route path="/" element={<WorksGallery currentLocation={currentLocation} filterOptions={filterOptions} />} />
-            <Route path="/upload" element={<UploadWork filterOptions={filterOptions} />} />
-            <Route path="/record/:workId" element={<TeachingRecord currentLocation={currentLocation} allSeniors={seniors} />} />
-            <Route path="/work/:workId" element={<WorkDetail currentLocation={currentLocation} />} />
-            <Route 
-              path="/settings" 
-              element={
-                <Settings 
-                  darkMode={darkMode} 
-                  setDarkMode={setDarkMode}
-                  locations={locations}
-                  seniors={seniors}
-                  filterOptions={filterOptions}
-                  onLocationsUpdate={refreshLocations}
-                  onSeniorsUpdate={refreshSeniors}
-                  onFilterOptionsUpdate={refreshFilterOptions}
-                />
-              } 
-            />
+            <Route path="/" element={
+              <WorksGallery
+                currentLocation={currentLocation}
+                filterOptions={filterOptions}
+              />
+            } />
+            <Route path="/upload" element={
+              <UploadWork filterOptions={filterOptions} />
+            } />
+            <Route path="/record/:workId" element={
+              <TeachingRecord
+                currentLocation={currentLocation}
+                allSeniors={seniors}
+              />
+            } />
+            <Route path="/work/:workId" element={
+              <WorkDetail currentLocation={currentLocation} />
+            } />
+            <Route path="/settings" element={
+              <Settings
+                darkMode={darkMode}
+                setDarkMode={setDarkMode}
+                locations={locations}
+                seniors={seniors}
+                filterOptions={filterOptions}
+                onLocationsUpdate={refreshLocations}
+                onSeniorsUpdate={refreshSeniors}
+                onFilterOptionsUpdate={refreshFilterOptions}
+              />
+            } />
           </Routes>
         </main>
 
@@ -120,7 +127,7 @@ function App() {
   )
 }
 
-// 中心選擇器 - 支援即時編輯/刪除
+// 中心選擇器
 function LocationSelector({ locations, currentLocation, onLocationChange, onLocationsUpdate }) {
   const [isOpen, setIsOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -178,11 +185,7 @@ function LocationSelector({ locations, currentLocation, onLocationChange, onLoca
           <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 rounded-xl shadow-2xl py-2 z-50 border border-gray-200 dark:border-gray-700 animate-fadeIn">
             <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 font-medium flex justify-between items-center">
               <span>選擇活動中心</span>
-              <Link
-                to="/settings"
-                onClick={() => setIsOpen(false)}
-                className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
-              >
+              <Link to="/settings" onClick={() => setIsOpen(false)} className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
                 ⚙️ 管理
               </Link>
             </div>
@@ -216,35 +219,23 @@ function LocationSelector({ locations, currentLocation, onLocationChange, onLoca
                         </div>
                       </div>
                     ) : (
-                      <div className={`flex items-center px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                        currentLocation?.id === loc.id ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''
-                      }`}>
+                      <div className={`flex items-center px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${currentLocation?.id === loc.id ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}>
                         <button
                           onClick={() => { onLocationChange(loc); setIsOpen(false) }}
-                          className={`flex-1 text-left flex items-center gap-2 ${
-                            currentLocation?.id === loc.id 
-                              ? 'text-indigo-600 dark:text-indigo-400 font-medium' 
-                              : 'text-gray-700 dark:text-gray-300'
-                          }`}
+                          className={`flex-1 text-left flex items-center gap-2 ${currentLocation?.id === loc.id ? 'text-indigo-600 dark:text-indigo-400 font-medium' : 'text-gray-700 dark:text-gray-300'}`}
                         >
                           {currentLocation?.id === loc.id && <span className="text-sm">✓</span>}
                           <span>{loc.name}</span>
                         </button>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-                          <button
-                            onClick={(e) => handleStartEdit(e, loc)}
-                            className="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
-                            title="編輯"
-                          >
+                          <button onClick={(e) => handleStartEdit(e, loc)}
+                            className="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors" title="編輯">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                             </svg>
                           </button>
-                          <button
-                            onClick={(e) => handleDelete(e, loc.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                            title="刪除"
-                          >
+                          <button onClick={(e) => handleDelete(e, loc.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="刪除">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
@@ -308,8 +299,8 @@ function NavItem({ to, icon, label, active }) {
   return (
     <Link to={to} className={`nav-item ${active ? 'active' : ''}`}>
       <div className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-200 ${
-        active 
-          ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md scale-105' 
+        active
+          ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md scale-105'
           : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
       }`}>
         <span className="text-2xl">{icon}</span>
