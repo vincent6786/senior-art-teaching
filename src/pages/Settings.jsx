@@ -158,6 +158,7 @@ function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp = [],
         <TabButton active={activeTab === 'locations'} onClick={() => setActiveTab('locations')} icon="🏢" label="活動中心" />
         <TabButton active={activeTab === 'seniors'} onClick={() => setActiveTab('seniors')} icon="👥" label="長輩管理" />
         <TabButton active={activeTab === 'filters'} onClick={() => setActiveTab('filters')} icon="🏷️" label="篩選條件" />
+        <TabButton active={activeTab === 'manual'} onClick={() => setActiveTab('manual')} icon="📖" label="使用說明" />
       </div>
 
       {activeTab === 'system' && (
@@ -198,6 +199,7 @@ function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp = [],
           onAdd={handleAddFilter}
         />
       )}
+      {activeTab === 'manual' && <ManualTab />}
     </div>
   )
 }
@@ -490,6 +492,185 @@ function FiltersTab({ filterOptions, newFilter, setNewFilter, onAdd }) {
           )}
         </div>
       ))}
+    </div>
+  )
+}
+
+// === 使用說明 ===
+function ManualSection({ icon, title, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+      >
+        <span className="flex items-center gap-3 font-semibold text-gray-900 dark:text-white">
+          <span className="text-xl">{icon}</span>
+          <span>{title}</span>
+        </span>
+        <span className="text-gray-400 text-sm">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-5 pb-5 pt-1 border-t border-gray-100 dark:border-gray-700 space-y-3 text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Step({ num, text }) {
+  return (
+    <div className="flex gap-3 items-start">
+      <span className="shrink-0 w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 text-xs font-bold flex items-center justify-center mt-0.5">{num}</span>
+      <span>{text}</span>
+    </div>
+  )
+}
+
+function Tip({ icon = '💡', text }) {
+  return (
+    <div className="flex gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+      <span className="shrink-0">{icon}</span>
+      <span className="text-yellow-800 dark:text-yellow-300 text-xs">{text}</span>
+    </div>
+  )
+}
+
+function ManualTab() {
+  return (
+    <div className="space-y-4 pb-4">
+      {/* 總覽 */}
+      <div className="bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl p-5 text-white shadow-md">
+        <h2 className="text-xl font-bold mb-1">📖 完整使用說明書</h2>
+        <p className="text-indigo-100 text-sm">長輩美術教學管理系統 · 點擊各章節展開說明</p>
+      </div>
+
+      {/* 第一次使用 */}
+      <ManualSection icon="🚀" title="第一步：初次設定" defaultOpen={true}>
+        <p className="font-medium text-gray-900 dark:text-white">請依序完成以下設定：</p>
+        <Step num="1" text="前往「活動中心」分頁，確認你的中心都已建立。系統預設已建立六個中心，你可以新增或刪除。" />
+        <Step num="2" text="前往「長輩管理」分頁，為每個中心新增長輩的名字（姓名 + 所屬中心）。" />
+        <Step num="3" text="前往「篩選條件」分頁，確認季節、節日、材料的選項符合你的需求，可以自由新增。" />
+        <Step num="4" text="回到作品庫（首頁），點擊右上角「選擇中心」切換到你要使用的中心。" />
+        <Step num="5" text="點選底部「📸 上傳」，開始上傳第一件作品！" />
+        <Tip text="長輩資料是按「所屬中心」分類的。記錄教學時，系統只會顯示「目前選擇的中心」底下的長輩。" />
+      </ManualSection>
+
+      {/* 上傳作品 */}
+      <ManualSection icon="📸" title="如何上傳作品">
+        <Step num="1" text="點選底部導覽列的「📸 上傳」按鈕。" />
+        <Step num="2" text="點擊「拍照」直接用相機拍攝作品，或點擊「從相簿選擇」選取已有的照片。" />
+        <Step num="3" text="填寫作品名稱（必填），例如：春天櫻花剪貼畫。" />
+        <Step num="4" text="選擇適合季節（春／夏／秋／冬／不限）。" />
+        <Step num="5" text="選擇相關節日（若無特定節日請選「無」）。" />
+        <Step num="6" text="選擇使用材料類型（紙類／黏土／布料等）。" />
+        <Step num="7" text="可選填作品描述，例如製作步驟或教學要點。" />
+        <Step num="8" text="點擊「上傳作品」完成！" />
+        <Tip icon="⚠️" text="上傳前請確認已選擇照片，且作品名稱不為空，否則無法送出。" />
+      </ManualSection>
+
+      {/* 瀏覽作品 */}
+      <ManualSection icon="🖼️" title="如何瀏覽與篩選作品">
+        <Step num="1" text="首頁（作品庫）會顯示所有已上傳的作品。" />
+        <Step num="2" text="頁面上方有篩選器，可按「季節」、「節日」、「材料」過濾作品。點同一個選項再點一次可取消。" />
+        <Step num="3" text="選擇中心後，每張作品卡片右上角會出現狀態標籤：「✓ 已教過」（綠色）或「⭐ 可教」（藍色）。" />
+        <Step num="4" text="點擊作品卡片可進入詳細頁面，查看完整資訊與教學歷史。" />
+        <Tip text="課前準備時，先切換到「要去的中心」，再用篩選器選出適合的作品，就能一眼看出哪些還沒教過！" />
+      </ManualSection>
+
+      {/* 記錄教學 */}
+      <ManualSection icon="📝" title="如何記錄教學">
+        <Step num="1" text="先在右上角選擇你今天去的活動中心。" />
+        <Step num="2" text="在作品卡片點擊「+ 記錄教學」按鈕，或進入作品詳細頁後點擊同樣的按鈕。" />
+        <Step num="3" text="確認或修改教學日期（預設為今天）。" />
+        <Step num="4" text="可選拍最多 3 張現場照片留存。" />
+        <Step num="5" text="勾選今天有參與的長輩。" />
+        <Step num="6" text="如果是「完整記錄模式」，可為每位長輩記錄完成狀態（完成／部分完成／未完成）與個別反應備註。" />
+        <Step num="7" text="填寫整體備註（例如今天教學氣氛、下次改進方向）。" />
+        <Step num="8" text="點擊「儲存記錄」完成！" />
+        <Tip text="在「設定 → 系統管理」可切換記錄模式：「完整記錄」含個別長輩狀態，「快速記錄」只需勾人即可。" />
+      </ManualSection>
+
+      {/* 查看歷史 */}
+      <ManualSection icon="📊" title="如何查看教學歷史記錄">
+        <Step num="1" text="點擊任一作品卡片，進入作品詳細頁。" />
+        <Step num="2" text="確認右上角已選擇中心，頁面下方會顯示「在此中心的教學記錄」。" />
+        <Step num="3" text="每筆記錄顯示教學日期與參與人數，點擊可展開查看：現場照片、整體備註、每位長輩的完成狀態與反應。" />
+        <Step num="4" text="若要刪除某筆記錄，展開後點擊「🗑️ 刪除此記錄」。" />
+        <Tip text="作品庫首頁的卡片上，也會顯示「在此中心教過 N 次」與「上次教學日期」，不用點進去就能快速掌握狀況。" />
+      </ManualSection>
+
+      {/* 切換中心 */}
+      <ManualSection icon="📍" title="如何切換活動中心">
+        <Step num="1" text="點擊頁面右上角的「📍 選擇中心」按鈕。" />
+        <Step num="2" text="在下拉選單中點擊要切換的中心名稱，勾選符號會出現在目前選擇的中心前面。" />
+        <Step num="3" text="切換後，首頁的作品教學統計、記錄教學的長輩名單都會對應切換。" />
+        <Tip text="在中心下拉選單中，滑鼠移到中心名稱上會出現「✏️ 編輯」和「🗑️ 刪除」按鈕，可直接在這裡管理中心。" />
+      </ManualSection>
+
+      {/* 刪除作品 */}
+      <ManualSection icon="🗑️" title="如何刪除作品">
+        <Step num="1" text="在作品庫（首頁），將滑鼠移到要刪除的作品卡片上（手機則長按）。" />
+        <Step num="2" text="點擊卡片左上角出現的「🗑️」紅色按鈕。" />
+        <Step num="3" text="確認對話框跳出後，點擊「確定刪除」。" />
+        <Tip icon="⚠️" text="刪除作品會連同該作品的所有教學記錄一起刪除，且無法復原！重要作品建議先備份。" />
+      </ManualSection>
+
+      {/* 深色模式 */}
+      <ManualSection icon="🌙" title="深色模式與外觀設定">
+        <Step num="1" text="在本設定頁面最上方找到「深色模式」開關。" />
+        <Step num="2" text="點擊切換，整個 App 立即套用深色/淺色主題。" />
+        <Step num="3" text="設定會自動記住，下次開啟 App 會保留你的選擇。" />
+        <Tip text="如果你的手機已開啟系統深色模式，App 首次開啟時會自動跟隨。" />
+      </ManualSection>
+
+      {/* 備份還原 */}
+      <ManualSection icon="📦" title="資料備份與還原">
+        <p className="font-medium text-gray-900 dark:text-white">備份方式：</p>
+        <Step num="1" text="前往「系統管理」分頁，點擊「📥 立即備份資料」。" />
+        <Step num="2" text="系統會自動下載一個 .json 備份檔案，包含所有作品、長輩、教學記錄與照片。" />
+        <Step num="3" text="將這個檔案存到雲端硬碟（Google Drive、iCloud 等）。" />
+        <p className="font-medium text-gray-900 dark:text-white mt-2">還原方式：</p>
+        <Step num="1" text="點擊「📤 從備份檔案還原」，選擇之前下載的 .json 檔案。" />
+        <Step num="2" text="確認後系統會覆蓋現有全部資料並還原備份內容。" />
+        <Tip icon="⚠️" text="還原前請務必先備份目前的資料！還原操作會清除現有所有資料再重新匯入。" />
+        <Tip text="建議每週備份一次，或在新增大量資料後立刻備份。" />
+      </ManualSection>
+
+      {/* 儲存空間 */}
+      <ManualSection icon="💾" title="儲存空間說明">
+        <p>系統使用 Supabase 免費方案，資料庫儲存上限為 <strong className="text-gray-900 dark:text-white">500 MB</strong>。</p>
+        <p>作品照片與現場照片都以壓縮後的 base64 格式存在資料庫中，每張約 0.3–0.5 MB。</p>
+        <p>在「系統管理」分頁可查看目前使用量、剩餘空間、照片總數。</p>
+        <Tip icon="⚠️" text="使用量超過 80% 時系統會出現警告，建議刪除不需要的舊作品或教學照片釋放空間。" />
+        <Tip text="若空間不足，也可以升級 Supabase 方案以獲得更多儲存空間。" />
+      </ManualSection>
+
+      {/* 常見問題 */}
+      <ManualSection icon="❓" title="常見問題 FAQ">
+        <div className="space-y-4">
+          {[
+            { q: '上傳照片失敗', a: '檢查 Supabase 的 CHECK 約束是否已移除（見資料庫設定）。也可確認圖片檔案大小不超過 10 MB。' },
+            { q: '記錄教學時出現 photos 欄位錯誤', a: '需要在 Supabase 執行：ALTER TABLE teaching_records ADD COLUMN IF NOT EXISTS photos TEXT[] DEFAULT \'{}\';' },
+            { q: '長輩名單沒有出現', a: '請確認已在「長輩管理」中新增長輩，且所屬中心與右上角目前選擇的中心相同。' },
+            { q: '篩選條件沒有選項', a: '前往「篩選條件」分頁新增選項，或確認 Supabase 的 filter_options 資料表有資料。' },
+            { q: '深色模式切換後只有部分地方生效', a: '重新整理頁面（下拉刷新）即可完全套用。' },
+            { q: '如何安裝到手機桌面', a: 'iOS 請用 Safari 開啟網址，點底部「分享」→「加入主畫面」。Android 請用 Chrome 開啟，點右上角選單→「安裝應用程式」。' },
+          ].map(({ q, a }) => (
+            <div key={q} className="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-4">
+              <p className="font-semibold text-gray-900 dark:text-white mb-1">Q：{q}</p>
+              <p className="text-gray-600 dark:text-gray-400 text-xs leading-relaxed">A：{a}</p>
+            </div>
+          ))}
+        </div>
+      </ManualSection>
+
+      {/* 版本 */}
+      <div className="text-center text-xs text-gray-400 dark:text-gray-500 py-4">
+        長輩美術教學管理系統 v2.3 · 祝教學順利 🎨
+      </div>
     </div>
   )
 }
