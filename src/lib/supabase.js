@@ -1,7 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
 
-// ⚠️ 重要：使用環境變數儲存敏感資訊
-// 在 Vercel 或本地的 .env 檔案中設定這些值
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
@@ -12,12 +10,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // ============================================
-// 實用的 API 函數封裝
-// ============================================
-
 // 1. 作品相關
+// ============================================
 export const worksAPI = {
-  // 取得所有作品（可篩選）
   async getAll(filters = {}) {
     let query = supabase
       .from('works')
@@ -33,7 +28,6 @@ export const worksAPI = {
     return data
   },
 
-  // 取得單一作品詳情
   async getById(id) {
     const { data, error } = await supabase
       .from('works')
@@ -45,7 +39,6 @@ export const worksAPI = {
     return data
   },
 
-  // 新增作品
   async create(work) {
     const { data, error } = await supabase
       .from('works')
@@ -56,7 +49,6 @@ export const worksAPI = {
     return data[0]
   },
 
-  // 更新作品
   async update(id, updates) {
     const { data, error } = await supabase
       .from('works')
@@ -68,16 +60,13 @@ export const worksAPI = {
     return data[0]
   },
 
-  // 刪除作品
   async delete(id) {
-    // 先刪除圖片
     const work = await this.getById(id)
     if (work.image_url) {
       const path = work.image_url.split('/').slice(-2).join('/')
       await supabase.storage.from('images').remove([path])
     }
     
-    // 再刪除資料庫記錄
     const { error } = await supabase
       .from('works')
       .delete()
@@ -87,7 +76,6 @@ export const worksAPI = {
     return true
   },
 
-  // 上傳作品圖片
   async uploadImage(file, workId) {
     const fileExt = file.name.split('.').pop()
     const fileName = `${workId}-${Date.now()}.${fileExt}`
@@ -106,7 +94,6 @@ export const worksAPI = {
     return data.publicUrl
   },
 
-  // 取得作品在特定中心的教學記錄
   async getLocationHistory(workId, locationId) {
     const { data, error } = await supabase
       .from('teaching_records')
@@ -126,7 +113,9 @@ export const worksAPI = {
   }
 }
 
+// ============================================
 // 2. 中心/據點相關
+// ============================================
 export const locationsAPI = {
   async getAll() {
     const { data, error } = await supabase
@@ -170,7 +159,9 @@ export const locationsAPI = {
   }
 }
 
+// ============================================
 // 3. 長輩相關
+// ============================================
 export const seniorsAPI = {
   async getByLocation(locationId) {
     const { data, error } = await supabase
@@ -204,11 +195,11 @@ export const seniorsAPI = {
   }
 }
 
+// ============================================
 // 4. 教學記錄相關
+// ============================================
 export const teachingRecordsAPI = {
-  // 新增教學記錄（包含長輩參與資訊）
   async create(record, participants) {
-    // 先建立教學記錄
     const { data: recordData, error: recordError } = await supabase
       .from('teaching_records')
       .insert([{
@@ -223,7 +214,6 @@ export const teachingRecordsAPI = {
     
     const teachingRecordId = recordData[0].id
     
-    // 再建立參與者記錄
     if (participants && participants.length > 0) {
       const participantRecords = participants.map(p => ({
         teaching_record_id: teachingRecordId,
@@ -242,7 +232,6 @@ export const teachingRecordsAPI = {
     return recordData[0]
   },
 
-  // 刪除教學記錄
   async delete(recordId) {
     const { error } = await supabase
       .from('teaching_records')
@@ -253,7 +242,6 @@ export const teachingRecordsAPI = {
     return true
   },
 
-  // 取得作品統計（被教過幾次）
   async getWorkStatistics(workId, locationId = null) {
     let query = supabase
       .from('teaching_records')
@@ -275,12 +263,12 @@ export const teachingRecordsAPI = {
   }
 }
 
-// 5. 系統管理 API (容量、備份、Logo)
+// ============================================
+// 5. 系統管理 API (容量、備份、還原)
+// ============================================
 export const systemAPI = {
-  // 取得儲存空間使用情況
   async getStorageUsage() {
     try {
-      // 取得所有圖片檔案
       const { data: files, error } = await supabase.storage
         .from('images')
         .list('works', {
@@ -290,10 +278,7 @@ export const systemAPI = {
 
       if (error) throw error
 
-      // 計算總大小（bytes）
       const totalSize = files.reduce((sum, file) => sum + (file.metadata?.size || 0), 0)
-      
-      // Supabase 免費方案：500MB
       const limitBytes = 500 * 1024 * 1024
       const usedMB = (totalSize / (1024 * 1024)).toFixed(2)
       const limitMB = 500
@@ -313,32 +298,26 @@ export const systemAPI = {
     }
   },
 
-  // 備份所有資料
   async backupAllData() {
     try {
-      // 取得所有資料表的資料
-      const [works, locations, seniors, teachingRecords, filterOptions] = await Promise.all([
+      const [works, locations, seniors, teachingRecords, teachingSeniors, filterOptions] = await Promise.all([
         supabase.from('works').select('*'),
         supabase.from('locations').select('*'),
         supabase.from('seniors').select('*'),
-        supabase.from('teaching_records').select(`
-          *,
-          teaching_seniors (
-            *,
-            seniors (name)
-          )
-        `),
+        supabase.from('teaching_records').select('*'),
+        supabase.from('teaching_seniors').select('*'),
         supabase.from('filter_options').select('*')
       ])
 
       const backup = {
-        version: '2.0',
+        version: '2.2',
         timestamp: new Date().toISOString(),
         data: {
           works: works.data || [],
           locations: locations.data || [],
           seniors: seniors.data || [],
           teaching_records: teachingRecords.data || [],
+          teaching_seniors: teachingSeniors.data || [],
           filter_options: filterOptions.data || []
         },
         stats: {
@@ -356,7 +335,6 @@ export const systemAPI = {
     }
   },
 
-  // 匯出備份為 JSON 檔案
   async exportBackup() {
     const backup = await this.backupAllData()
     const dataStr = JSON.stringify(backup, null, 2)
@@ -372,51 +350,139 @@ export const systemAPI = {
     return backup.stats
   },
 
-  // 上傳 Logo
-  async uploadLogo(file) {
+  // 還原備份資料
+  async restoreBackup(backup) {
+    if (!backup.data) throw new Error('無效的備份檔案')
+
+    const results = {
+      locations: 0,
+      seniors: 0,
+      works: 0,
+      records: 0,
+      filters: 0
+    }
+
     try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `logo.${fileExt}`
-      const filePath = `system/${fileName}`
+      // 還原順序很重要：先還原被依賴的表
+      
+      // 1. 還原活動中心
+      if (backup.data.locations && backup.data.locations.length > 0) {
+        // 清除現有資料（級聯刪除會處理相關記錄）
+        await supabase.from('teaching_seniors').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+        await supabase.from('teaching_records').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+        await supabase.from('seniors').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+        await supabase.from('locations').delete().neq('id', '00000000-0000-0000-0000-000000000000')
 
-      // 先刪除舊的 Logo（如果存在）
-      await supabase.storage.from('images').remove([filePath])
+        const locationsToInsert = backup.data.locations.map(loc => ({
+          id: loc.id,
+          name: loc.name,
+          address: loc.address || '',
+          created_at: loc.created_at
+        }))
+        
+        const { error } = await supabase.from('locations').insert(locationsToInsert)
+        if (error) throw new Error('還原中心失敗: ' + error.message)
+        results.locations = locationsToInsert.length
+      }
 
-      // 上傳新的 Logo
-      const { error: uploadError } = await supabase.storage
-        .from('images')
-        .upload(filePath, file, { upsert: true })
+      // 2. 還原長輩
+      if (backup.data.seniors && backup.data.seniors.length > 0) {
+        const seniorsToInsert = backup.data.seniors.map(s => ({
+          id: s.id,
+          name: s.name,
+          location_id: s.location_id,
+          notes: s.notes || '',
+          created_at: s.created_at
+        }))
 
-      if (uploadError) throw uploadError
+        const { error } = await supabase.from('seniors').insert(seniorsToInsert)
+        if (error) throw new Error('還原長輩失敗: ' + error.message)
+        results.seniors = seniorsToInsert.length
+      }
 
-      const { data } = supabase.storage
-        .from('images')
-        .getPublicUrl(filePath)
+      // 3. 還原作品（注意：不會還原圖片檔案，只還原資料庫記錄）
+      if (backup.data.works && backup.data.works.length > 0) {
+        await supabase.from('works').delete().neq('id', '00000000-0000-0000-0000-000000000000')
 
-      // 存到 localStorage
-      localStorage.setItem('customLogo', data.publicUrl)
+        const worksToInsert = backup.data.works.map(w => ({
+          id: w.id,
+          title: w.title,
+          image_url: w.image_url,
+          thumbnail_url: w.thumbnail_url || null,
+          season: w.season,
+          festival: w.festival,
+          material_type: w.material_type,
+          description: w.description || '',
+          created_at: w.created_at,
+          updated_at: w.updated_at
+        }))
 
-      return data.publicUrl
+        const { error } = await supabase.from('works').insert(worksToInsert)
+        if (error) throw new Error('還原作品失敗: ' + error.message)
+        results.works = worksToInsert.length
+      }
+
+      // 4. 還原教學記錄
+      if (backup.data.teaching_records && backup.data.teaching_records.length > 0) {
+        const recordsToInsert = backup.data.teaching_records.map(r => ({
+          id: r.id,
+          work_id: r.work_id,
+          location_id: r.location_id,
+          teaching_date: r.teaching_date,
+          notes: r.notes || '',
+          created_at: r.created_at
+        }))
+
+        const { error } = await supabase.from('teaching_records').insert(recordsToInsert)
+        if (error) throw new Error('還原教學記錄失敗: ' + error.message)
+        results.records = recordsToInsert.length
+      }
+
+      // 5. 還原教學長輩記錄
+      if (backup.data.teaching_seniors && backup.data.teaching_seniors.length > 0) {
+        const tsToInsert = backup.data.teaching_seniors.map(ts => ({
+          id: ts.id,
+          teaching_record_id: ts.teaching_record_id,
+          senior_id: ts.senior_id,
+          completion_status: ts.completion_status,
+          reaction: ts.reaction || '',
+          created_at: ts.created_at
+        }))
+
+        const { error } = await supabase.from('teaching_seniors').insert(tsToInsert)
+        if (error) console.warn('部分教學長輩記錄還原失敗:', error.message)
+      }
+
+      // 6. 還原篩選條件
+      if (backup.data.filter_options && backup.data.filter_options.length > 0) {
+        await supabase.from('filter_options').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+
+        const filtersToInsert = backup.data.filter_options.map(f => ({
+          id: f.id,
+          category: f.category,
+          value: f.value,
+          display_order: f.display_order || 0,
+          is_active: f.is_active !== undefined ? f.is_active : true,
+          created_at: f.created_at
+        }))
+
+        const { error } = await supabase.from('filter_options').insert(filtersToInsert)
+        if (error) throw new Error('還原篩選條件失敗: ' + error.message)
+        results.filters = filtersToInsert.length
+      }
+
+      return results
     } catch (error) {
-      console.error('上傳 Logo 失敗:', error)
+      console.error('還原失敗:', error)
       throw error
     }
-  },
-
-  // 取得自訂 Logo
-  getCustomLogo() {
-    return localStorage.getItem('customLogo')
-  },
-
-  // 移除自訂 Logo
-  removeCustomLogo() {
-    localStorage.removeItem('customLogo')
   }
 }
 
+// ============================================
 // 6. 篩選條件管理 API
+// ============================================
 export const filterOptionsAPI = {
-  // 取得所有篩選選項
   async getAll() {
     const { data, error } = await supabase
       .from('filter_options')
@@ -426,7 +492,6 @@ export const filterOptionsAPI = {
     
     if (error) throw error
     
-    // 按類別分組
     const grouped = {
       season: [],
       festival: [],
@@ -442,7 +507,6 @@ export const filterOptionsAPI = {
     return grouped
   },
 
-  // 取得特定類別的選項
   async getByCategory(category) {
     const { data, error } = await supabase
       .from('filter_options')
@@ -455,7 +519,6 @@ export const filterOptionsAPI = {
     return data.map(option => option.value)
   },
 
-  // 新增篩選選項
   async create(category, value, displayOrder = 999) {
     const { data, error } = await supabase
       .from('filter_options')
@@ -470,7 +533,6 @@ export const filterOptionsAPI = {
     return data[0]
   },
 
-  // 刪除篩選選項
   async delete(id) {
     const { error } = await supabase
       .from('filter_options')
