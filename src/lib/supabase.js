@@ -71,7 +71,7 @@ export const worksAPI = {
       reader.onload = (e) => {
         img.onload = () => {
           const canvas = document.createElement('canvas')
-          const maxSize = 800
+          const maxSize = 600
           let { width, height } = img
           if (width > maxSize || height > maxSize) {
             if (width > height) { height = Math.round(height * maxSize / width); width = maxSize }
@@ -79,7 +79,7 @@ export const worksAPI = {
           }
           canvas.width = width; canvas.height = height
           canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-          resolve(canvas.toDataURL('image/jpeg', 0.75))
+          resolve(canvas.toDataURL('image/jpeg', 0.65))
         }
         img.onerror = reject
         img.src = e.target.result
