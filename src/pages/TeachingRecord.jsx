@@ -6,9 +6,37 @@ import { format } from 'date-fns'
 const CLOUD_NAME = 'dbq5zvmwv'
 const UPLOAD_PRESET = 'vetwuqsc'
 
-// 上傳現場照片到 Cloudinary（不佔 Supabase 空間）
+// 上傳現場照片：依設定選擇 Cloudinary 或 base64
 async function uploadFieldPhoto(file) {
-  // 先壓縮再上傳
+  const mode = localStorage.getItem('storageMode') || 'cloudinary'
+
+  if (mode === 'supabase') {
+    // base64 壓縮，存 Supabase
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        img.onload = () => {
+          const maxSize = 600
+          let { width, height } = img
+          if (width > maxSize || height > maxSize) {
+            if (width > height) { height = Math.round(height * maxSize / width); width = maxSize }
+            else { width = Math.round(width * maxSize / height); height = maxSize }
+          }
+          const canvas = document.createElement('canvas')
+          canvas.width = width; canvas.height = height
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+          resolve(canvas.toDataURL('image/jpeg', 0.7))
+        }
+        img.onerror = reject
+        img.src = e.target.result
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  // Cloudinary 上傳
   const blob = await new Promise((resolve, reject) => {
     const img = new Image()
     const reader = new FileReader()

@@ -7,6 +7,9 @@ function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp = [],
   const [teachingDetailMode, setTeachingDetailMode] = useState(
     () => localStorage.getItem('teachingDetailMode') !== 'simple'
   )
+  const [storageMode, setStorageMode] = useState(
+    () => localStorage.getItem('storageMode') || 'cloudinary'
+  )
 
   const [newLocation, setNewLocation] = useState({ name: '', address: '' })
   const [newSenior, setNewSenior] = useState({ name: '', location_id: '', notes: '' })
@@ -28,6 +31,11 @@ function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp = [],
   const handleTeachingDetailModeChange = (value) => {
     setTeachingDetailMode(value)
     localStorage.setItem('teachingDetailMode', value ? 'full' : 'simple')
+  }
+
+  const handleStorageModeChange = (mode) => {
+    setStorageMode(mode)
+    localStorage.setItem('storageMode', mode)
   }
 
   // 備份
@@ -169,6 +177,8 @@ function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp = [],
           onRefreshStorage={async () => { setStorageUsage(null); await loadStorageStatus() }}
           teachingDetailMode={teachingDetailMode}
           onTeachingDetailModeChange={handleTeachingDetailModeChange}
+          storageMode={storageMode}
+          onStorageModeChange={handleStorageModeChange}
         />
       )}
       {activeTab === 'locations' && (
@@ -220,7 +230,7 @@ function TabButton({ active, onClick, icon, label }) {
 }
 
 // === 系統管理 ===
-function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage, teachingDetailMode, onTeachingDetailModeChange }) {
+function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage, teachingDetailMode, onTeachingDetailModeChange, storageMode, onStorageModeChange }) {
   return (
     <div className="space-y-6">
       {/* 教學記錄模式 */}
@@ -243,6 +253,31 @@ function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage, teachi
         </div>
       </div>
 
+      {/* 照片儲存方式 */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">照片儲存方式</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">選擇新照片要存到哪裡（不影響已上傳的舊照片）</p>
+        <div className="flex gap-3">
+          <button onClick={() => onStorageModeChange('cloudinary')}
+            className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all duration-200 text-sm font-medium text-center ${storageMode === 'cloudinary' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400'}`}>
+            <span className="block text-lg mb-1">☁️</span>
+            <span className="block font-semibold mb-0.5">Cloudinary</span>
+            <span className="block text-xs opacity-75">免費 25 GB・推薦</span>
+          </button>
+          <button onClick={() => onStorageModeChange('supabase')}
+            className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all duration-200 text-sm font-medium text-center ${storageMode === 'supabase' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400'}`}>
+            <span className="block text-lg mb-1">🗄️</span>
+            <span className="block font-semibold mb-0.5">Supabase</span>
+            <span className="block text-xs opacity-75">資料庫內建・500 MB 上限</span>
+          </button>
+        </div>
+        {storageMode === 'supabase' && (
+          <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+            <p className="text-xs text-orange-700 dark:text-orange-400">⚠️ Supabase 模式下照片存在資料庫，容量有限（500 MB）。建議確認剩餘空間足夠再使用。</p>
+          </div>
+        )}
+      </div>
+
       {/* 儲存空間 */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
@@ -257,66 +292,87 @@ function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage, teachi
         {storageUsage ? (
           <div className="space-y-4">
 
-            {/* Supabase 資料庫用量 */}
+            {/* 總覽 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">作品總數</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{storageUsage.worksCount}<span className="text-xs font-normal ml-0.5">件</span></p>
+              </div>
+              <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">照片總數</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{storageUsage.totalPhotos}<span className="text-xs font-normal ml-0.5">張</span></p>
+              </div>
+            </div>
+
+            {/* 照片細項表格 */}
+            <div className="border border-gray-200 dark:border-gray-600 rounded-xl overflow-hidden">
+              <div className="grid grid-cols-3 bg-gray-100 dark:bg-gray-700 text-xs font-semibold text-gray-600 dark:text-gray-300">
+                <div className="px-3 py-2">類別</div>
+                <div className="px-3 py-2 text-center">☁️ Cloudinary</div>
+                <div className="px-3 py-2 text-center">🗄️ Supabase</div>
+              </div>
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                <div className="grid grid-cols-3 text-sm">
+                  <div className="px-3 py-3 text-gray-700 dark:text-gray-300 font-medium">作品主圖</div>
+                  <div className="px-3 py-3 text-center">
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400">{storageUsage.workCloudinary}</span>
+                    <span className="text-xs text-gray-400 ml-0.5">張</span>
+                  </div>
+                  <div className="px-3 py-3 text-center">
+                    <span className="font-bold text-orange-500">{storageUsage.workBase64}</span>
+                    <span className="text-xs text-gray-400 ml-0.5">張</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 text-sm bg-gray-50 dark:bg-gray-700/30">
+                  <div className="px-3 py-3 text-gray-700 dark:text-gray-300 font-medium">現場照片</div>
+                  <div className="px-3 py-3 text-center">
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400">{storageUsage.fieldCloudinary}</span>
+                    <span className="text-xs text-gray-400 ml-0.5">張</span>
+                  </div>
+                  <div className="px-3 py-3 text-center">
+                    <span className="font-bold text-orange-500">{storageUsage.fieldBase64}</span>
+                    <span className="text-xs text-gray-400 ml-0.5">張</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 text-sm font-semibold bg-gray-100 dark:bg-gray-700">
+                  <div className="px-3 py-3 text-gray-700 dark:text-gray-300">小計</div>
+                  <div className="px-3 py-3 text-center text-indigo-600 dark:text-indigo-400">{storageUsage.cloudinaryTotal} 張</div>
+                  <div className="px-3 py-3 text-center text-orange-500">{storageUsage.supabaseTotal} 張</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Supabase 用量進度條 */}
             <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1">
-                  🗄️ Supabase 資料庫
-                  <span className="text-xs text-gray-400 font-normal">（舊照片）</span>
-                </span>
-                <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                  {storageUsage.usedMB} / {storageUsage.limitMB} MB
-                  <span className={`ml-2 text-xs font-bold ${parseFloat(storageUsage.usedPercent) > 80 ? 'text-red-500' : parseFloat(storageUsage.usedPercent) > 60 ? 'text-yellow-500' : 'text-green-500'}`}>
-                    {storageUsage.usedPercent}%
-                  </span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">🗄️ Supabase 資料庫用量</span>
+                <span className={`text-sm font-bold ${parseFloat(storageUsage.usedPercent) > 80 ? 'text-red-500' : parseFloat(storageUsage.usedPercent) > 60 ? 'text-yellow-500' : 'text-green-500'}`}>
+                  {storageUsage.usedPercent}%
                 </span>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3 overflow-hidden">
+              <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3 overflow-hidden mb-2">
                 <div className={`h-full rounded-full transition-all duration-500 ${parseFloat(storageUsage.usedPercent) > 80 ? 'bg-red-500' : parseFloat(storageUsage.usedPercent) > 60 ? 'bg-yellow-500' : 'bg-green-500'}`}
                   style={{ width: `${Math.min(Math.max(parseFloat(storageUsage.usedPercent), 0.5), 100)}%` }} />
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">剩餘 {storageUsage.remainingMB} MB・舊照片 {storageUsage.base64Count} 張</p>
-            </div>
-
-            {/* Cloudinary 用量 */}
-            <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300 flex items-center gap-1">
-                  ☁️ Cloudinary 雲端
-                  <span className="text-xs text-indigo-400 font-normal">（新照片）</span>
-                </span>
-                <span className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full">
-                  25 GB 免費
-                </span>
-              </div>
-              <div className="flex items-center justify-between mt-2">
-                <p className="text-xs text-indigo-600 dark:text-indigo-400">已上傳 {storageUsage.cloudinaryCount} 張照片到 Cloudinary</p>
-                <p className="text-xs text-green-600 dark:text-green-400 font-medium">✅ 不佔 Supabase 空間</p>
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                <span>已用 {storageUsage.usedMB} MB</span>
+                <span>剩餘 {storageUsage.remainingMB} MB / {storageUsage.limitMB} MB</span>
               </div>
             </div>
 
-            {/* 統計格子 */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">作品總數</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{storageUsage.worksCount}<span className="text-xs font-normal ml-0.5">件</span></p>
+            {/* Cloudinary 說明 */}
+            <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300">☁️ Cloudinary 雲端儲存</p>
+                <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-0.5">共 {storageUsage.cloudinaryTotal} 張 · 不佔 Supabase 空間</p>
               </div>
-              <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">舊照片</p>
-                <p className="text-xl font-bold text-orange-500">{storageUsage.base64Count}<span className="text-xs font-normal ml-0.5">張</span></p>
-                <p className="text-xs text-gray-400 mt-0.5">佔 Supabase</p>
-              </div>
-              <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">新照片</p>
-                <p className="text-xl font-bold text-indigo-500">{storageUsage.cloudinaryCount}<span className="text-xs font-normal ml-0.5">張</span></p>
-                <p className="text-xs text-gray-400 mt-0.5">存 Cloudinary</p>
-              </div>
+              <span className="text-xs font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-3 py-1 rounded-full">25 GB 免費</span>
             </div>
 
             {parseFloat(storageUsage.usedPercent) > 80 && (
               <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                 <p className="text-sm text-red-800 dark:text-red-300 font-medium">⚠️ Supabase 空間即將用完</p>
-                <p className="text-xs text-red-600 dark:text-red-400 mt-1">舊照片（橘色數字）佔用了空間，可考慮刪除舊作品釋放空間。新作品已自動存到 Cloudinary 不會再增加。</p>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">建議將「照片儲存方式」切換為 Cloudinary，或刪除舊作品釋放空間。</p>
               </div>
             )}
           </div>
