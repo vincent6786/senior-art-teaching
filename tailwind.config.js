@@ -4,6 +4,7 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class', // 啟用 class 模式的 dark mode
   theme: {
     extend: {
       colors: {
@@ -18,6 +19,15 @@ export default {
           700: '#4338ca',
           800: '#3730a3',
           900: '#312e81',
+        }
+      },
+      animation: {
+        'fadeIn': 'fadeIn 0.3s ease-out',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0', transform: 'translateY(-10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         }
       }
     },
