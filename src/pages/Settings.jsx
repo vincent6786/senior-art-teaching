@@ -1,47 +1,25 @@
 import { useState, useEffect } from 'react'
 import { locationsAPI, seniorsAPI, filterOptionsAPI, systemAPI } from '../lib/supabase'
 
-function Settings({ darkMode, setDarkMode, locations, onLocationsUpdate }) {
+function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp, filterOptions: filterOptionsProp, onLocationsUpdate, onSeniorsUpdate, onFilterOptionsUpdate }) {
   const [activeTab, setActiveTab] = useState('system')
-  const [seniors, setSeniors] = useState([])
-  const [filterOptions, setFilterOptions] = useState({
-    season: [],
-    festival: [],
-    material_type: []
-  })
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [storageUsage, setStorageUsage] = useState(null)
+  const [teachingDetailMode, setTeachingDetailMode] = useState(
+    () => localStorage.getItem('teachingDetailMode') !== 'simple'
+  )
+
+  // 用 prop 直接顯示，不再自己 fetch
+  const seniors = seniorsProp || []
+  const filterOptions = filterOptionsProp || { season: [], festival: [], material_type: [] }
 
   const [newLocation, setNewLocation] = useState({ name: '', address: '' })
   const [newSenior, setNewSenior] = useState({ name: '', location_id: '', notes: '' })
   const [newFilter, setNewFilter] = useState({ category: 'season', value: '' })
 
   useEffect(() => {
-    if (locations.length >= 0) loadAll()
-  }, [locations])
-
-  const loadAll = async () => {
-    setLoading(true)
-    try {
-      // 全部平行載入
-      const [filterData, allSeniors, usage] = await Promise.all([
-        filterOptionsAPI.getAll(),
-        seniorsAPI.getAll(),
-        systemAPI.getStorageUsage()
-      ])
-      setFilterOptions(filterData)
-      // 加上 location_name（getAll 已帶 join，但以防萬一用 locations 對照）
-      setSeniors(allSeniors.map(s => ({
-        ...s,
-        location_name: s.location_name || locations.find(l => l.id === s.location_id)?.name || ''
-      })))
-      setStorageUsage(usage)
-    } catch (error) {
-      console.error('載入設定失敗:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+    loadSystemStatus()
+  }, [])
 
   const loadSystemStatus = async () => {
     try {
@@ -50,6 +28,11 @@ function Settings({ darkMode, setDarkMode, locations, onLocationsUpdate }) {
     } catch (error) {
       console.error('載入系統狀態失敗:', error)
     }
+  }
+
+  const handleTeachingDetailModeChange = (value) => {
+    setTeachingDetailMode(value)
+    localStorage.setItem('teachingDetailMode', value ? 'full' : 'simple')
   }
 
   // 備份
@@ -75,17 +58,11 @@ function Settings({ darkMode, setDarkMode, locations, onLocationsUpdate }) {
     try {
       const text = await file.text()
       const backup = JSON.parse(text)
-      
-      if (!backup.version || !backup.data) {
-        throw new Error('無效的備份檔案格式')
-      }
-
+      if (!backup.version || !backup.data) throw new Error('無效的備份檔案格式')
       const result = await systemAPI.restoreBackup(backup)
       alert(`還原成功！\n作品：${result.works}\n中心：${result.locations}\n長輩：${result.seniors}\n教學記錄：${result.records}\n篩選條件：${result.filters}`)
-      
-      // 重新載入所有資料
-      await onLocationsUpdate()
-      await loadAll()
+      await Promise.all([onLocationsUpdate(), onSeniorsUpdate(), onFilterOptionsUpdate()])
+      await loadSystemStatus()
     } catch (error) {
       alert('還原失敗：' + error.message)
     } finally {
@@ -101,7 +78,6 @@ function Settings({ darkMode, setDarkMode, locations, onLocationsUpdate }) {
       await locationsAPI.create(newLocation)
       setNewLocation({ name: '', address: '' })
       await onLocationsUpdate()
-      alert('新增成功！')
     } catch (error) {
       alert('新增失敗：' + error.message)
     }
@@ -120,8 +96,7 @@ function Settings({ darkMode, setDarkMode, locations, onLocationsUpdate }) {
     if (!confirm('確定要刪除此中心嗎？相關的教學記錄也會被刪除。')) return
     try {
       await locationsAPI.delete(id)
-      await onLocationsUpdate()
-      alert('刪除成功！')
+      await Promise.all([onLocationsUpdate(), onSeniorsUpdate()])
     } catch (error) {
       alert('刪除失敗：' + error.message)
     }
@@ -134,8 +109,7 @@ function Settings({ darkMode, setDarkMode, locations, onLocationsUpdate }) {
     try {
       await seniorsAPI.create(newSenior)
       setNewSenior({ name: '', location_id: '', notes: '' })
-      await loadSeniorsAndFilters()
-      alert('新增成功！')
+      await onSeniorsUpdate()
     } catch (error) {
       alert('新增失敗：' + error.message)
     }
@@ -145,8 +119,7 @@ function Settings({ darkMode, setDarkMode, locations, onLocationsUpdate }) {
     if (!confirm('確定要刪除此長輩嗎？')) return
     try {
       await seniorsAPI.delete(id)
-      await loadSeniorsAndFilters()
-      alert('刪除成功！')
+      await onSeniorsUpdate()
     } catch (error) {
       alert('刪除失敗：' + error.message)
     }
@@ -159,14 +132,13 @@ function Settings({ darkMode, setDarkMode, locations, onLocationsUpdate }) {
     try {
       await filterOptionsAPI.create(newFilter.category, newFilter.value)
       setNewFilter({ ...newFilter, value: '' })
-      await loadSeniorsAndFilters()
-      alert('新增成功！')
+      await onFilterOptionsUpdate()
     } catch (error) {
       alert('新增失敗：' + error.message)
     }
   }
 
-  if (loading && locations.length === 0) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
@@ -209,11 +181,9 @@ function Settings({ darkMode, setDarkMode, locations, onLocationsUpdate }) {
           storageUsage={storageUsage}
           onBackup={handleBackup}
           onRestore={handleRestore}
-          onRefreshStorage={async () => {
-            setStorageUsage(null)
-            const usage = await systemAPI.getStorageUsage()
-            setStorageUsage(usage)
-          }}
+          onRefreshStorage={async () => { setStorageUsage(null); await loadSystemStatus() }}
+          teachingDetailMode={teachingDetailMode}
+          onTeachingDetailModeChange={handleTeachingDetailModeChange}
         />
       )}
       {activeTab === 'locations' && (
@@ -260,19 +230,38 @@ function TabButton({ active, onClick, icon, label }) {
 }
 
 // === 系統管理 ===
-function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage }) {
+function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage, teachingDetailMode, onTeachingDetailModeChange }) {
   return (
     <div className="space-y-6">
+
+      {/* 教學記錄模式 */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">教學記錄模式</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">選擇記錄教學時是否需要填寫每位長輩的完成狀態與個別備註</p>
+        <div className="flex gap-3">
+          <button onClick={() => onTeachingDetailModeChange(true)}
+            className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all duration-200 text-sm font-medium text-center ${teachingDetailMode ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400'}`}>
+            <span className="block text-lg mb-1">📋</span>
+            <span className="block font-semibold mb-0.5">完整記錄</span>
+            <span className="block text-xs opacity-75">含完成狀態、個別備註</span>
+          </button>
+          <button onClick={() => onTeachingDetailModeChange(false)}
+            className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all duration-200 text-sm font-medium text-center ${!teachingDetailMode ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400'}`}>
+            <span className="block text-lg mb-1">⚡</span>
+            <span className="block font-semibold mb-0.5">快速記錄</span>
+            <span className="block text-xs opacity-75">只勾選參與長輩即可</span>
+          </button>
+        </div>
+      </div>
+
       {/* 儲存空間 */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
             <span>💾</span><span>儲存空間使用量</span>
           </h3>
-          <button
-            onClick={onRefreshStorage}
-            className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium px-2 py-1 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
-          >
+          <button onClick={onRefreshStorage}
+            className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium px-2 py-1 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
             🔄 重新整理
           </button>
         </div>
@@ -284,12 +273,8 @@ function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage }) {
                 <span className="font-semibold text-gray-900 dark:text-white">{storageUsage.usedPercent}%</span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    parseFloat(storageUsage.usedPercent) > 80 ? 'bg-red-500' : parseFloat(storageUsage.usedPercent) > 60 ? 'bg-yellow-500' : 'bg-green-500'
-                  }`}
-                  style={{ width: `${Math.min(storageUsage.usedPercent, 100)}%` }}
-                />
+                <div className={`h-full rounded-full transition-all duration-500 ${parseFloat(storageUsage.usedPercent) > 80 ? 'bg-red-500' : parseFloat(storageUsage.usedPercent) > 60 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                  style={{ width: `${Math.min(storageUsage.usedPercent, 100)}%` }} />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -303,7 +288,7 @@ function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage }) {
               </div>
               <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-xl text-center">
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">作品數</p>
-                <p className="text-xl font-bold text-gray-900 dark:text-white">{storageUsage.worksCount}<span className="text-xs font-normal ml-0.5">件</span></p>
+                <p className="text-xl font-bold text-gray-900 dark:text-white">{storageUsage.worksCount || 0}<span className="text-xs font-normal ml-0.5">件</span></p>
               </div>
             </div>
             {parseFloat(storageUsage.usedPercent) > 80 && (
@@ -328,9 +313,7 @@ function SystemTab({ storageUsage, onBackup, onRestore, onRefreshStorage }) {
         </h3>
         <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg mb-4">
           <p className="text-sm text-green-800 dark:text-green-300 font-medium">✅ 備份包含所有照片</p>
-          <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-            作品照片與教學現場照片均以圖片格式儲存於資料庫中，備份時會完整打包，還原後照片完全恢復。
-          </p>
+          <p className="text-xs text-green-600 dark:text-green-400 mt-1">作品照片與教學現場照片均內嵌於資料庫中，備份時完整打包，還原後照片完全恢復。</p>
         </div>
         <div className="space-y-3">
           <button onClick={onBackup} className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-lg font-medium transition-all duration-200 hover:scale-[1.02] shadow-md">

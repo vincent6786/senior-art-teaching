@@ -1,17 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { worksAPI, filterOptionsAPI } from '../lib/supabase'
+import { worksAPI } from '../lib/supabase'
 
-function UploadWork() {
+function UploadWork({ filterOptions }) {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [imagePreview, setImagePreview] = useState(null)
   const [imageFile, setImageFile] = useState(null)
-  const [filterOptions, setFilterOptions] = useState({
-    season: [],
-    festival: [],
-    material_type: []
-  })
   
   const [formData, setFormData] = useState({
     title: '',
@@ -20,11 +15,6 @@ function UploadWork() {
     material_type: '',
     description: ''
   })
-
-  // 載入篩選選項
-  useEffect(() => {
-    filterOptionsAPI.getAll().then(setFilterOptions)
-  }, [])
 
   // 處理圖片選擇
   const handleImageChange = (e) => {
@@ -70,18 +60,21 @@ function UploadWork() {
     setLoading(true)
 
     try {
-      // 壓縮圖片（client-side，直接存 base64，不需要 Storage）
-      const imageUrl = await worksAPI.uploadImage(imageFile)
-
-      // 一次建立作品（含圖片）
-      await worksAPI.create({
+      // 先建立作品記錄
+      const work = await worksAPI.create({
         title: formData.title,
         season: formData.season || '不限',
         festival: formData.festival,
         material_type: formData.material_type,
         description: formData.description,
-        image_url: imageUrl
+        image_url: 'temp' // 暫時的
       })
+
+      // 上傳圖片
+      const imageUrl = await worksAPI.uploadImage(imageFile, work.id)
+
+      // 更新作品的圖片網址
+      await worksAPI.update(work.id, { image_url: imageUrl })
 
       alert('作品上傳成功！')
       navigate('/')
@@ -265,7 +258,7 @@ function UploadWork() {
             disabled={loading}
             className="flex-1 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white rounded-lg font-medium shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? '⏳ 壓縮並上傳中...' : '上傳作品'}
+            {loading ? '上傳中...' : '上傳作品'}
           </button>
         </div>
       </form>

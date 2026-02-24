@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { worksAPI, teachingRecordsAPI, filterOptionsAPI } from '../lib/supabase'
+import { worksAPI, teachingRecordsAPI } from '../lib/supabase'
 import { format } from 'date-fns'
 
-function WorksGallery({ currentLocation }) {
+function WorksGallery({ currentLocation, filterOptions }) {
   const [works, setWorks] = useState([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
@@ -11,17 +11,7 @@ function WorksGallery({ currentLocation }) {
     festival: '',
     material_type: ''
   })
-  const [filterOptions, setFilterOptions] = useState({
-    season: [],
-    festival: [],
-    material_type: []
-  })
   const [workStats, setWorkStats] = useState({})
-
-  // 載入篩選選項
-  useEffect(() => {
-    filterOptionsAPI.getAll().then(setFilterOptions)
-  }, [])
 
   // 載入作品列表
   useEffect(() => {
