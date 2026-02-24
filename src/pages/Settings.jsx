@@ -11,6 +11,14 @@ function Settings({ darkMode, setDarkMode, locations, onLocationsUpdate }) {
   })
   const [loading, setLoading] = useState(true)
   const [storageUsage, setStorageUsage] = useState(null)
+  const [teachingDetailMode, setTeachingDetailMode] = useState(
+    () => localStorage.getItem('teachingDetailMode') !== 'simple'
+  )
+
+  const handleTeachingDetailModeChange = (value) => {
+    setTeachingDetailMode(value)
+    localStorage.setItem('teachingDetailMode', value ? 'full' : 'simple')
+  }
 
   const [newLocation, setNewLocation] = useState({ name: '', address: '' })
   const [newSenior, setNewSenior] = useState({ name: '', location_id: '', notes: '' })
@@ -183,7 +191,7 @@ function Settings({ darkMode, setDarkMode, locations, onLocationsUpdate }) {
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">系統設定</h1>
 
       {/* Dark Mode */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-4 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">深色模式</h3>
@@ -196,6 +204,40 @@ function Settings({ darkMode, setDarkMode, locations, onLocationsUpdate }) {
             <span className={`inline-block h-10 w-10 transform rounded-full bg-white shadow-lg transition-transform flex items-center justify-center ${darkMode ? 'translate-x-9' : 'translate-x-1'}`}>
               {darkMode ? '🌙' : '☀️'}
             </span>
+          </button>
+        </div>
+      </div>
+
+      {/* 教學記錄模式 */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6 border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">教學記錄模式</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          選擇記錄教學時是否需要填寫每位長輩的完成狀態與個別備註
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => handleTeachingDetailModeChange(true)}
+            className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all duration-200 text-sm font-medium ${
+              teachingDetailMode
+                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
+                : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-500'
+            }`}
+          >
+            <span className="block text-lg mb-1">📋</span>
+            <span className="block font-semibold mb-0.5">完整記錄</span>
+            <span className="block text-xs opacity-75">含完成狀態、個別備註</span>
+          </button>
+          <button
+            onClick={() => handleTeachingDetailModeChange(false)}
+            className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all duration-200 text-sm font-medium ${
+              !teachingDetailMode
+                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
+                : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-500'
+            }`}
+          >
+            <span className="block text-lg mb-1">⚡</span>
+            <span className="block font-semibold mb-0.5">快速記錄</span>
+            <span className="block text-xs opacity-75">只勾選參與長輩即可</span>
           </button>
         </div>
       </div>
