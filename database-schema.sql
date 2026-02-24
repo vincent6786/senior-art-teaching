@@ -8,12 +8,23 @@ CREATE TABLE works (
     title VARCHAR(255) NOT NULL,
     image_url TEXT NOT NULL,
     thumbnail_url TEXT,
-    season VARCHAR(20) CHECK (season IN ('春', '夏', '秋', '冬', '不限')),
-    festival VARCHAR(50) CHECK (festival IN ('春節', '元宵', '清明', '端午', '中秋', '重陽', '無')),
-    material_type VARCHAR(50) CHECK (material_type IN ('紙類', '黏土', '布料', '綜合媒材', '其他')),
+    season VARCHAR(20),
+    festival VARCHAR(50),
+    material_type VARCHAR(50),
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2. 篩選條件設定表 (新增！可自訂篩選選項)
+CREATE TABLE filter_options (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    category VARCHAR(50) NOT NULL, -- 'season', 'festival', 'material_type'
+    value VARCHAR(100) NOT NULL,
+    display_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(category, value)
 );
 
 -- 2. 活動中心表
@@ -124,11 +135,37 @@ CREATE TRIGGER update_works_updated_at BEFORE UPDATE ON works
 -- 範例資料 (測試用)
 -- ============================================
 
--- 插入測試中心
+-- 插入實際教學中心
 INSERT INTO locations (name, address) VALUES 
-    ('文山樂齡中心', '聯新平鎮'),
-    ('聯新中壢', '聯新復旦'),
-    ('三峽中埔', '佳醫中壢');
+    ('文山樂齡中心', ''),
+    ('聯新平鎮', ''),
+    ('聯新中壢', ''),
+    ('聯新復旦', ''),
+    ('三峽中埔', ''),
+    ('佳醫中壢', '');
+
+-- 插入預設篩選條件選項
+INSERT INTO filter_options (category, value, display_order) VALUES
+    -- 季節選項
+    ('season', '春', 1),
+    ('season', '夏', 2),
+    ('season', '秋', 3),
+    ('season', '冬', 4),
+    ('season', '不限', 5),
+    -- 節日選項
+    ('festival', '春節', 1),
+    ('festival', '元宵', 2),
+    ('festival', '清明', 3),
+    ('festival', '端午', 4),
+    ('festival', '中秋', 5),
+    ('festival', '重陽', 6),
+    ('festival', '無', 7),
+    -- 材料類型選項
+    ('material_type', '紙類', 1),
+    ('material_type', '黏土', 2),
+    ('material_type', '布料', 3),
+    ('material_type', '綜合媒材', 4),
+    ('material_type', '其他', 5);
 
 -- 插入測試長輩
 INSERT INTO seniors (name, location_id, notes) 
