@@ -259,54 +259,55 @@ export const teachingRecordsAPI = {
 export const systemAPI = {
   async getStorageUsage() {
     try {
-      // 平行查作品圖片與教學記錄
       const [worksRes, recordsRes] = await Promise.all([
         supabase.from('works').select('id, image_url'),
         supabase.from('teaching_records').select('photos')
       ])
       if (worksRes.error) throw worksRes.error
 
-      let totalBytes = 0
-      let photoCount = 0
+      // 分開計算：Supabase（base64）vs Cloudinary（網址）
+      let supabaseBytes = 0
+      let cloudinaryCount = 0
+      let base64Count = 0
       const worksCount = worksRes.data?.length || 0
 
-      // 計算每張作品主圖的大小（base64 或 URL 都算）
       for (const w of worksRes.data || []) {
-        if (w.image_url) {
-          if (w.image_url.startsWith('data:')) {
-            // base64：字串長度 * 0.75 ≈ 實際 bytes
-            totalBytes += Math.round(w.image_url.length * 0.75)
-          } else if (w.image_url.startsWith('http')) {
-            // Storage URL：估算平均 200KB
-            totalBytes += 200 * 1024
-          }
-          photoCount++
+        if (!w.image_url) continue
+        if (w.image_url.startsWith('data:')) {
+          supabaseBytes += Math.round(w.image_url.length * 0.75)
+          base64Count++
+        } else if (w.image_url.includes('cloudinary.com')) {
+          cloudinaryCount++
         }
       }
 
-      // 教學現場照片
+      // 教學現場照片（目前都是 base64）
+      let fieldPhotoCount = 0
       for (const r of recordsRes.data || []) {
         for (const p of r.photos || []) {
           if (p?.startsWith('data:')) {
-            totalBytes += Math.round(p.length * 0.75)
-          } else if (p?.startsWith('http')) {
-            totalBytes += 200 * 1024
+            supabaseBytes += Math.round(p.length * 0.75)
+            fieldPhotoCount++
+          } else if (p?.includes('cloudinary.com')) {
+            cloudinaryCount++
           }
-          photoCount++
         }
       }
 
       const limitBytes = 500 * 1024 * 1024
-      const usedMB = (totalBytes / (1024 * 1024)).toFixed(2)
-      const usedPercent = ((totalBytes / limitBytes) * 100).toFixed(1)
+      const usedMB = (supabaseBytes / (1024 * 1024)).toFixed(2)
+      const usedPercent = ((supabaseBytes / limitBytes) * 100).toFixed(1)
 
       return {
-        totalSize: totalBytes,
+        totalSize: supabaseBytes,
         usedMB,
         limitMB: 500,
         usedPercent,
         remainingMB: Math.max(0, 500 - parseFloat(usedMB)).toFixed(2),
-        photoCount,
+        photoCount: base64Count + fieldPhotoCount,
+        cloudinaryCount,
+        base64Count,
+        fieldPhotoCount,
         worksCount
       }
     } catch (error) {
