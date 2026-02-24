@@ -63,15 +63,19 @@ export const worksAPI = {
     return true
   },
 
-  // 壓縮圖片並回傳 base64（client-side，不需要 Storage）
+  // 上傳圖片到 Cloudinary（免費 25GB 儲存空間）
   async uploadImage(file) {
-    return new Promise((resolve, reject) => {
+    const CLOUD_NAME = 'dbq5zvmwv'
+    const UPLOAD_PRESET = 'vetwuqsc'
+
+    // 先在瀏覽器壓縮，減少上傳流量
+    const compressedBlob = await new Promise((resolve, reject) => {
       const img = new Image()
       const reader = new FileReader()
       reader.onload = (e) => {
         img.onload = () => {
           const canvas = document.createElement('canvas')
-          const maxSize = 600
+          const maxSize = 1200
           let { width, height } = img
           if (width > maxSize || height > maxSize) {
             if (width > height) { height = Math.round(height * maxSize / width); width = maxSize }
@@ -79,7 +83,7 @@ export const worksAPI = {
           }
           canvas.width = width; canvas.height = height
           canvas.getContext('2d').drawImage(img, 0, 0, width, height)
-          resolve(canvas.toDataURL('image/jpeg', 0.65))
+          canvas.toBlob(resolve, 'image/jpeg', 0.82)
         }
         img.onerror = reject
         img.src = e.target.result
@@ -87,6 +91,22 @@ export const worksAPI = {
       reader.onerror = reject
       reader.readAsDataURL(file)
     })
+
+    // 上傳到 Cloudinary
+    const formData = new FormData()
+    formData.append('file', compressedBlob, 'photo.jpg')
+    formData.append('upload_preset', UPLOAD_PRESET)
+    formData.append('folder', 'senior-art')
+
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+      { method: 'POST', body: formData }
+    )
+    const data = await res.json()
+    if (data.error) throw new Error('Cloudinary 上傳失敗：' + data.error.message)
+
+    // 回傳 Cloudinary 自動最佳化的網址（webp 格式、自動壓縮）
+    return data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/')
   },
 
   async getLocationHistory(workId, locationId) {
