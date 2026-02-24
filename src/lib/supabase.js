@@ -226,45 +226,21 @@ export const teachingRecordsAPI = {
 export const systemAPI = {
   async getStorageUsage() {
     try {
-      // 取作品圖片 + 教學記錄現場照片，平行查詢
-      const [worksRes, recordsRes] = await Promise.all([
-        supabase.from('works').select('image_url'),
-        supabase.from('teaching_records').select('photos')
-      ])
-      if (worksRes.error) throw worksRes.error
+      const { data: files, error } = await supabase.storage
+        .from('images')
+        .list('works', { limit: 1000, sortBy: { column: 'created_at', order: 'desc' } })
+      if (error) throw error
 
-      // 計算 base64 字串大小（bytes ≈ base64長度 * 3/4）
-      let totalBytes = 0
-      let photoCount = 0
-
-      for (const w of worksRes.data || []) {
-        if (w.image_url?.startsWith('data:')) {
-          totalBytes += Math.round(w.image_url.length * 0.75)
-          photoCount++
-        }
-      }
-      for (const r of recordsRes.data || []) {
-        for (const p of r.photos || []) {
-          if (p?.startsWith('data:')) {
-            totalBytes += Math.round(p.length * 0.75)
-            photoCount++
-          }
-        }
-      }
-
-      // Supabase 免費版 DB 上限 500MB
+      const totalSize = files.reduce((sum, file) => sum + (file.metadata?.size || 0), 0)
       const limitBytes = 500 * 1024 * 1024
-      const usedMB = (totalBytes / (1024 * 1024)).toFixed(2)
-      const usedPercent = ((totalBytes / limitBytes) * 100).toFixed(1)
+      const usedMB = (totalSize / (1024 * 1024)).toFixed(2)
+      const limitMB = 500
+      const usedPercent = ((totalSize / limitBytes) * 100).toFixed(1)
 
       return {
-        totalSize: totalBytes,
-        usedMB,
-        limitMB: 500,
-        usedPercent,
-        remainingMB: Math.max(0, 500 - parseFloat(usedMB)).toFixed(2),
-        fileCount: photoCount,
-        worksCount: worksRes.data?.length || 0
+        totalSize, usedMB, limitMB, usedPercent,
+        remainingMB: (limitMB - usedMB).toFixed(2),
+        fileCount: files.length
       }
     } catch (error) {
       console.error('取得容量失敗:', error)
