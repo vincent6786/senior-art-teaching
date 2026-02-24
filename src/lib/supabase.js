@@ -64,17 +64,18 @@ export const worksAPI = {
   },
 
   // 上傳作品主圖：依設定選擇 Cloudinary 或 Supabase(base64)
+  // 固定壓縮規格：最長邊 900px、品質 0.78 → 每張約 180 KB
   async uploadImage(file) {
     const mode = localStorage.getItem('storageMode') || 'cloudinary'
     if (mode === 'supabase') {
-      return this._uploadImageBase64(file, 1200, 0.82)
+      return this._uploadImageBase64(file, 900, 0.78)
     } else {
-      return this._uploadImageCloudinary(file, 'senior-art', 1200, 0.82)
+      return this._uploadImageCloudinary(file, 'senior-art', 900, 0.78)
     }
   },
 
   // 內部：base64 壓縮（存 Supabase）
-  async _uploadImageBase64(file, maxSize = 800, quality = 0.78) {
+  async _uploadImageBase64(file, maxSize = 900, quality = 0.78) {
     return new Promise((resolve, reject) => {
       const img = new Image()
       const reader = new FileReader()
@@ -98,8 +99,8 @@ export const worksAPI = {
     })
   },
 
-  // 內部：上傳到 Cloudinary
-  async _uploadImageCloudinary(file, folder = 'senior-art', maxSize = 1200, quality = 0.82) {
+  // 內部：上傳到 Cloudinary（前端先壓縮再上傳）
+  async _uploadImageCloudinary(file, folder = 'senior-art', maxSize = 900, quality = 0.78) {
     const CLOUD_NAME = 'dbq5zvmwv'
     const UPLOAD_PRESET = 'vetwuqsc'
 
@@ -136,7 +137,8 @@ export const worksAPI = {
     )
     const data = await res.json()
     if (data.error) throw new Error('Cloudinary 上傳失敗：' + data.error.message)
-    return data.secure_url.replace('/upload/', '/upload/f_auto,q_auto/')
+    // 關閉 Cloudinary 的額外壓縮（我們已在前端統一壓縮好了）
+    return data.secure_url
   },
 
   async getLocationHistory(workId, locationId) {
@@ -333,6 +335,23 @@ export const systemAPI = {
       const cloudinaryTotal = workCloudinary + fieldCloudinary
       const supabaseTotal = workBase64 + fieldBase64
 
+      // ── 固定壓縮規格 ──────────────────────────────
+      // 作品主圖：900px / 0.78 quality → 約 180 KB
+      // 現場照片：650px / 0.72 quality → 約  90 KB
+      // Supabase base64 直接由字串長度精確計算，誤差極小
+      // Cloudinary 依固定規格計算，準確度高
+      // ─────────────────────────────────────────────
+      const WORK_PHOTO_KB  = 180  // 作品主圖固定規格
+      const FIELD_PHOTO_KB =  90  // 現場照片固定規格
+
+      const cloudinaryEstimatedBytes =
+        (workCloudinary * WORK_PHOTO_KB * 1024) +
+        (fieldCloudinary * FIELD_PHOTO_KB * 1024)
+      const cloudinaryLimitBytes = 25 * 1024 * 1024 * 1024 // 25 GB
+      const cloudinaryUsedMB = (cloudinaryEstimatedBytes / (1024 * 1024)).toFixed(1)
+      const cloudinaryUsedPercent = ((cloudinaryEstimatedBytes / cloudinaryLimitBytes) * 100).toFixed(3)
+      const cloudinaryRemainingGB = Math.max(0, 25 - cloudinaryEstimatedBytes / (1024 * 1024 * 1024)).toFixed(2)
+
       return {
         totalSize: supabaseBytes,
         usedMB,
@@ -349,7 +368,11 @@ export const systemAPI = {
         // Cloudinary 細項
         cloudinaryTotal,
         workCloudinary,
-        fieldCloudinary
+        fieldCloudinary,
+        // Cloudinary 估算用量
+        cloudinaryUsedMB,
+        cloudinaryUsedPercent,
+        cloudinaryRemainingGB
       }
     } catch (error) {
       console.error('取得容量失敗:', error)
