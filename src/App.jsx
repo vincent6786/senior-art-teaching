@@ -103,7 +103,7 @@ function App() {
               />
             } />
             <Route path="/work/:workId" element={
-              <WorkDetail currentLocation={currentLocation} />
+              <WorkDetail currentLocation={currentLocation} filterOptions={filterOptions} />
             } />
             <Route path="/settings" element={
               <Settings
