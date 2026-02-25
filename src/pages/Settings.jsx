@@ -138,6 +138,25 @@ function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp = [],
     }
   }
 
+  const handleDeleteFilter = async (id) => {
+    if (!confirm('確定要刪除此篩選選項嗎？')) return
+    try {
+      await filterOptionsAPI.delete(id)
+      await onFilterOptionsUpdate()
+    } catch (error) {
+      alert('刪除失敗：' + error.message)
+    }
+  }
+
+  const handleUpdateFilter = async (id, newValue) => {
+    try {
+      await filterOptionsAPI.update(id, newValue)
+      await onFilterOptionsUpdate()
+    } catch (error) {
+      alert('更新失敗：' + error.message)
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto pb-24">
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">系統設定</h1>
@@ -207,6 +226,8 @@ function Settings({ darkMode, setDarkMode, locations, seniors: seniorsProp = [],
           newFilter={newFilter}
           setNewFilter={setNewFilter}
           onAdd={handleAddFilter}
+          onDelete={handleDeleteFilter}
+          onUpdate={handleUpdateFilter}
         />
       )}
       {activeTab === 'manual' && <ManualTab />}
@@ -557,7 +578,63 @@ function SeniorsTab({ seniors, locations, newSenior, setNewSenior, onAdd, onDele
 }
 
 // === 篩選條件 ===
-function FiltersTab({ filterOptions, newFilter, setNewFilter, onAdd }) {
+function FilterTag({ item, onDelete, onUpdate }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState(item.value)
+
+  const handleSave = () => {
+    if (!editValue.trim() || editValue.trim() === item.value) { setIsEditing(false); return }
+    onUpdate(item.id, editValue.trim())
+    setIsEditing(false)
+  }
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1 px-2 py-1 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-300 dark:border-indigo-600 rounded-full">
+        <input
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setIsEditing(false) }}
+          className="w-20 text-sm bg-transparent text-indigo-700 dark:text-indigo-300 focus:outline-none"
+          autoFocus
+        />
+        <button onClick={handleSave} className="text-green-600 dark:text-green-400 hover:text-green-800 text-xs font-bold px-1">✓</button>
+        <button onClick={() => { setIsEditing(false); setEditValue(item.value) }} className="text-gray-400 hover:text-gray-600 text-xs px-1">✕</button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="group flex items-center gap-1 px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-medium">
+      <span>{item.value}</span>
+      {item.id !== null && (
+        <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+          <button
+            onClick={() => setIsEditing(true)}
+            className="text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-200 transition-colors"
+            title="編輯"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          </button>
+          <button
+            onClick={() => onDelete(item.id)}
+            className="text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
+            title="刪除"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </span>
+      )}
+    </div>
+  )
+}
+
+function FiltersTab({ filterOptions, newFilter, setNewFilter, onAdd, onDelete, onUpdate }) {
   const categoryLabels = { season: '季節', festival: '節日', material_type: '材料類型' }
 
   return (
@@ -581,15 +658,26 @@ function FiltersTab({ filterOptions, newFilter, setNewFilter, onAdd }) {
         </form>
       </div>
 
-      {Object.entries(filterOptions).map(([category, values]) => (
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+        <p className="text-sm text-blue-700 dark:text-blue-300">
+          💡 <strong>提示：</strong>將滑鼠移到標籤上，即可看到✏️編輯與✕刪除按鈕。預設內建選項（無 ID）不可刪除。
+        </p>
+      </div>
+
+      {Object.entries(filterOptions).map(([category, items]) => (
         <div key={category} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{categoryLabels[category]}</h3>
-          {values.length === 0 ? (
+          {items.length === 0 ? (
             <p className="text-sm text-gray-400 dark:text-gray-500 italic">（無選項）</p>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {values.map((value, idx) => (
-                <span key={idx} className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-medium">{value}</span>
+              {items.map((item, idx) => (
+                <FilterTag
+                  key={item.id ?? `default-${idx}`}
+                  item={item}
+                  onDelete={onDelete}
+                  onUpdate={onUpdate}
+                />
               ))}
             </div>
           )}
@@ -655,7 +743,7 @@ function ManualTab() {
         <p className="font-medium text-gray-900 dark:text-white">請依序完成以下設定：</p>
         <Step num="1" text="前往「活動中心」分頁，確認你的中心都已建立。系統預設已建立六個中心，你可以新增或刪除。" />
         <Step num="2" text="前往「長輩管理」分頁，為每個中心新增長輩的名字（姓名 + 所屬中心）。" />
-        <Step num="3" text="前往「篩選條件」分頁，確認季節、節日、材料的選項符合你的需求，可以自由新增。" />
+        <Step num="3" text="前往「篩選條件」分頁，確認季節、節日、材料的選項符合你的需求，可以自由新增、編輯或刪除。" />
         <Step num="4" text="回到作品庫（首頁），點擊右上角「選擇中心」切換到你要使用的中心。" />
         <Step num="5" text="點選底部「📸 上傳」，開始上傳第一件作品！" />
         <Tip text="長輩資料是按「所屬中心」分類的。記錄教學時，系統只會顯示「目前選擇的中心」底下的長輩。" />
@@ -668,7 +756,7 @@ function ManualTab() {
         <Step num="3" text="填寫作品名稱（必填），例如：春天櫻花剪貼畫。" />
         <Step num="4" text="選擇適合季節（春／夏／秋／冬／不限）。" />
         <Step num="5" text="選擇相關節日（若無特定節日請選「無」）。" />
-        <Step num="6" text="選擇使用材料類型（紙類／黏土／布料等）。" />
+        <Step num="6" text="選擇使用材料類型（可多選，例如：紙類、水彩、不織布等），這些選項可在「篩選條件」設定中自訂。" />
         <Step num="7" text="可選填作品描述，例如製作步驟或教學要點。" />
         <Step num="8" text="點擊「上傳作品」完成！" />
         <Tip icon="⚠️" text="上傳前請確認已選擇照片，且作品名稱不為空，否則無法送出。" />
@@ -705,12 +793,33 @@ function ManualTab() {
         <Tip text="作品庫首頁的卡片上，也會顯示「在此中心教過 N 次」與「上次教學日期」，不用點進去就能快速掌握狀況。" />
       </ManualSection>
 
+      {/* 篩選條件管理 */}
+      <ManualSection icon="🏷️" title="如何管理篩選條件（季節／節日／材料）">
+        <Step num="1" text="前往「設定 → 篩選條件」分頁。" />
+        <Step num="2" text="在「新增篩選選項」區塊，選擇類別（季節／節日／材料類型），輸入名稱後點「+ 新增選項」。" />
+        <Step num="3" text="若要修改已有的選項，將滑鼠移到標籤上，點「✏️」圖示，直接在框內修改後按 Enter 或 ✓ 儲存。" />
+        <Step num="4" text="若要刪除選項，將滑鼠移到標籤上，點「✕」圖示，確認後即刪除。" />
+        <Tip text="材料類型選項會同步顯示在「上傳作品」頁面與作品庫的篩選器中，新增後立即生效！" />
+        <Tip icon="⚠️" text="系統內建的預設選項（沒有✏️按鈕的標籤）不可編輯刪除。如需完全自訂，請先在資料庫建立自訂選項，它們就可以自由管理。" />
+      </ManualSection>
+
       {/* 切換中心 */}
       <ManualSection icon="📍" title="如何切換活動中心">
         <Step num="1" text="點擊頁面右上角的「📍 選擇中心」按鈕。" />
         <Step num="2" text="在下拉選單中點擊要切換的中心名稱，勾選符號會出現在目前選擇的中心前面。" />
         <Step num="3" text="切換後，首頁的作品教學統計、記錄教學的長輩名單都會對應切換。" />
         <Tip text="在中心下拉選單中，滑鼠移到中心名稱上會出現「✏️ 編輯」和「🗑️ 刪除」按鈕，可直接在這裡管理中心。" />
+      </ManualSection>
+
+      {/* 資料同步 */}
+      <ManualSection icon="🔄" title="資料同步說明">
+        <p className="font-medium text-gray-900 dark:text-white">所有資料都即時同步到雲端！</p>
+        <Step num="1" text="所有操作（新增、編輯、刪除）都會立即寫入 Supabase 雲端資料庫，下次開啟 App 自動讀取最新資料。" />
+        <Step num="2" text="作品、教學記錄、長輩名單、活動中心、篩選條件全部都在同一個雲端資料庫，任何更改都會即時反映到畫面上。" />
+        <Step num="3" text="如果你在多個裝置使用同一帳號，任一裝置做的更改都會同步到其他裝置（重新整理頁面即可）。" />
+        <Step num="4" text="篩選條件更新後，上傳作品頁面和首頁篩選器的選項會立即同步更新，不需要重新整理。" />
+        <Tip text="如果發現資料沒有即時更新，請確認網路連線正常，或嘗試重新整理頁面（下拉重新整理）。" />
+        <Tip icon="🛡️" text="雲端同步雖然可靠，仍建議定期備份！前往「系統管理 → 立即備份資料」匯出備份檔案。" />
       </ManualSection>
 
       {/* 刪除作品 */}
@@ -768,8 +877,10 @@ function ManualTab() {
             { q: '記錄教學時出現 photos 欄位錯誤', a: '需要在 Supabase 執行：ALTER TABLE teaching_records ADD COLUMN IF NOT EXISTS photos TEXT[] DEFAULT \'{}\';' },
             { q: '長輩名單沒有出現', a: '請確認已在「長輩管理」中新增長輩，且所屬中心與右上角目前選擇的中心相同。' },
             { q: '篩選條件沒有選項', a: '前往「篩選條件」分頁新增選項，或確認 Supabase 的 filter_options 資料表有資料。' },
+            { q: '篩選條件的編輯/刪除按鈕在哪裡？', a: '將滑鼠移到標籤上（手機長按），就會出現 ✏️ 和 ✕ 按鈕。預設內建值沒有這些按鈕，只有自行新增的選項才能編輯刪除。' },
             { q: '深色模式切換後只有部分地方生效', a: '重新整理頁面（下拉刷新）即可完全套用。' },
             { q: '如何安裝到手機桌面', a: 'iOS 請用 Safari 開啟網址，點底部「分享」→「加入主畫面」。Android 請用 Chrome 開啟，點右上角選單→「安裝應用程式」。' },
+            { q: '多台裝置資料不同步', a: '所有資料存在雲端，請確認網路正常後重新整理頁面即可同步到最新狀態。' },
           ].map(({ q, a }) => (
             <div key={q} className="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-4">
               <p className="font-semibold text-gray-900 dark:text-white mb-1">Q：{q}</p>
@@ -781,7 +892,7 @@ function ManualTab() {
 
       {/* 版本 */}
       <div className="text-center text-xs text-gray-400 dark:text-gray-500 py-4">
-        長輩美術教學管理系統 v2.3 · 祝教學順利 🎨
+        長輩美術教學管理系統 v2.4 · 祝教學順利 🎨
       </div>
     </div>
   )
