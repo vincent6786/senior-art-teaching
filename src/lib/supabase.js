@@ -506,11 +506,23 @@ export const systemAPI = {
 // 永遠可用的硬編碼預設值（資料庫空或失敗時 fallback）
 const DEFAULT_FILTER_OPTIONS = {
   season: ['春', '夏', '秋', '冬', '不限'],
-  festival: ['無', '春節', '元宵', '清明', '端午', '中秋', '重陽', '聖誕'],
-  material_type: ['紙類', '黏土', '布料', '綜合媒材', '其他']
+  festival: ['無', '春節', '元宵', '清明', '端午', '中秋', '重陽', '聖誕', '母親節', '父親節', '兒童節', '教師節', '情人節'],
+  material_type: ['紙類', '黏土', '布料', '水彩', '粉蠟筆', '色鉛筆', '毛線', '不織布', '珠珠', '鋁線', '木材', '貝殼', '乾燥花', '回收材料', '綜合媒材', '其他']
+}
+
+// 內部：將預設字串陣列轉成 {id: null, value} 物件陣列
+function _defaultToObjects(defaults) {
+  return Object.fromEntries(
+    Object.entries(defaults).map(([cat, vals]) => [
+      cat,
+      vals.map(v => ({ id: null, value: v }))
+    ])
+  )
 }
 
 export const filterOptionsAPI = {
+  // 回傳格式：{ season: [{id, value}, ...], festival: [...], material_type: [...] }
+  // 當無資料庫資料時，id 為 null（代表預設值，不可刪除）
   async getAll() {
     try {
       const { data, error } = await supabase
@@ -519,30 +531,30 @@ export const filterOptionsAPI = {
         .eq('is_active', true)
         .order('display_order')
 
-      // 資料庫錯誤或 RLS 阻擋 → 回傳預設值
+      // 資料庫錯誤或 RLS 阻擋 → 回傳預設值物件
       if (error) {
         console.warn('filter_options 查詢失敗，使用預設值:', error.message)
-        return { ...DEFAULT_FILTER_OPTIONS }
+        return _defaultToObjects(DEFAULT_FILTER_OPTIONS)
       }
 
       const grouped = { season: [], festival: [], material_type: [] }
       data.forEach(option => {
         if (grouped[option.category] !== undefined) {
-          grouped[option.category].push(option.value)
+          grouped[option.category].push({ id: option.id, value: option.value })
         }
       })
 
-      // 資料庫是空的 → 回傳預設值（不嘗試寫入，避免 UNIQUE 衝突）
+      // 資料庫是空的 → 回傳預設值物件（不嘗試寫入，避免 UNIQUE 衝突）
       const hasData = Object.values(grouped).some(arr => arr.length > 0)
       if (!hasData) {
         console.info('filter_options 資料表是空的，使用預設值')
-        return { ...DEFAULT_FILTER_OPTIONS }
+        return _defaultToObjects(DEFAULT_FILTER_OPTIONS)
       }
 
       return grouped
     } catch (err) {
       console.warn('filterOptionsAPI.getAll 例外，使用預設值:', err.message)
-      return { ...DEFAULT_FILTER_OPTIONS }
+      return _defaultToObjects(DEFAULT_FILTER_OPTIONS)
     }
   },
 
@@ -550,6 +562,16 @@ export const filterOptionsAPI = {
     const { data, error } = await supabase
       .from('filter_options')
       .insert([{ category, value, display_order: displayOrder, is_active: true }])
+      .select()
+    if (error) throw error
+    return data[0]
+  },
+
+  async update(id, newValue) {
+    const { data, error } = await supabase
+      .from('filter_options')
+      .update({ value: newValue })
+      .eq('id', id)
       .select()
     if (error) throw error
     return data[0]
