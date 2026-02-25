@@ -223,9 +223,9 @@ function WorkCard({ work, stats, currentLocation, onDelete }) {
           {work.festival && work.festival !== '無' && (
             <span className="text-xs px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-md font-medium">{work.festival}</span>
           )}
-          {work.material_type && (
-            <span className="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-md font-medium">{work.material_type}</span>
-          )}
+          {work.material_type && work.material_type.split(',').filter(Boolean).map(m => (
+            <span key={m} className="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-md font-medium">{m.trim()}</span>
+          ))}
         </div>
         {currentLocation && stats && (
           <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1 mb-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-2">
