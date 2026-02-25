@@ -21,7 +21,8 @@ export const worksAPI = {
 
     if (filters.season) query = query.eq('season', filters.season)
     if (filters.festival) query = query.eq('festival', filters.festival)
-    if (filters.material_type) query = query.eq('material_type', filters.material_type)
+    // 材料支援多選（逗號分隔），用 ilike 包含查詢
+    if (filters.material_type) query = query.ilike('material_type', `%${filters.material_type}%`)
 
     const { data, error } = await query
     if (error) throw error
