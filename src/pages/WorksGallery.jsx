@@ -6,9 +6,10 @@ import { format } from 'date-fns'
 function WorksGallery({ currentLocation, filterOptions = { season: [], festival: [], material_type: [] } }) {
   const [works, setWorks] = useState([])
   const [loading, setLoading] = useState(true)
+  const [statsLoading, setStatsLoading] = useState(false)
   const [filters, setFilters] = useState({ season: '', festival: '', material_type: '' })
+  const [taughtFilter, setTaughtFilter] = useState('') // '' | 'taught' | 'not_taught'
   const [workStats, setWorkStats] = useState({})
-
   useEffect(() => {
     loadWorks()
   }, [filters])
@@ -34,6 +35,7 @@ function WorksGallery({ currentLocation, filterOptions = { season: [], festival:
   }
 
   const loadWorkStatistics = async () => {
+    setStatsLoading(true)
     const stats = {}
     await Promise.all(works.map(async (work) => {
       try {
@@ -44,7 +46,18 @@ function WorksGallery({ currentLocation, filterOptions = { season: [], festival:
       }
     }))
     setWorkStats(stats)
+    setStatsLoading(false)
   }
+
+  // 套用「已教過/未教過」前端篩選
+  const displayedWorks = (() => {
+    if (!taughtFilter || !currentLocation) return works
+    return works.filter(work => {
+      const stat = workStats[work.id]
+      const taught = stat && stat.total_times > 0
+      return taughtFilter === 'taught' ? taught : !taught
+    })
+  })()
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value === prev[key] ? '' : value }))
@@ -60,7 +73,7 @@ function WorksGallery({ currentLocation, filterOptions = { season: [], festival:
     }
   }
 
-  const hasActiveFilters = filters.season || filters.festival || filters.material_type
+  const hasActiveFilters = filters.season || filters.festival || filters.material_type || taughtFilter
 
   return (
     <div className="pb-24">
@@ -80,6 +93,36 @@ function WorksGallery({ currentLocation, filterOptions = { season: [], festival:
         </h3>
 
         <div className="space-y-4">
+          {/* 教學狀態篩選 — 只在選擇了中心時顯示 */}
+          {currentLocation && (
+            <div>
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 block">
+                教學狀態
+                {statsLoading && taughtFilter && (
+                  <span className="ml-2 text-indigo-400 animate-pulse">載入中…</span>
+                )}
+              </label>
+              <div className="flex gap-2">
+                {[
+                  { value: 'not_taught', label: '⭐ 未教過', activeClass: 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md scale-105' },
+                  { value: 'taught',     label: '✓ 已教過',  activeClass: 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md scale-105' },
+                ].map(({ value, label, activeClass }) => (
+                  <button
+                    key={value}
+                    onClick={() => setTaughtFilter(prev => prev === value ? '' : value)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
+                      taughtFilter === value
+                        ? activeClass
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <FilterGroup
             label="季節"
             options={filterOptions.season}
@@ -102,7 +145,7 @@ function WorksGallery({ currentLocation, filterOptions = { season: [], festival:
 
         {hasActiveFilters && (
           <button
-            onClick={() => setFilters({ season: '', festival: '', material_type: '' })}
+            onClick={() => { setFilters({ season: '', festival: '', material_type: '' }); setTaughtFilter('') }}
             className="mt-4 w-full py-2 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium transition-colors"
           >
             ✕ 清除所有篩選
@@ -116,20 +159,26 @@ function WorksGallery({ currentLocation, filterOptions = { season: [], festival:
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
           <p className="mt-4 text-gray-600 dark:text-gray-400">載入中...</p>
         </div>
-      ) : works.length === 0 ? (
+      ) : displayedWorks.length === 0 ? (
         <div className="text-center py-12 bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
           <span className="text-6xl mb-4 block">🎨</span>
-          <p className="text-gray-500 dark:text-gray-400 text-lg mb-4">找不到符合條件的作品</p>
-          <Link
-            to="/upload"
-            className="inline-block px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-200 hover:scale-105"
-          >
-            📸 上傳第一個作品
-          </Link>
+          <p className="text-gray-500 dark:text-gray-400 text-lg mb-4">
+            {taughtFilter === 'not_taught' ? '這個中心已把所有作品都教過了！' :
+             taughtFilter === 'taught'     ? '這個中心還沒有已教過的作品。' :
+             '找不到符合條件的作品'}
+          </p>
+          {!taughtFilter && (
+            <Link
+              to="/upload"
+              className="inline-block px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-medium hover:shadow-lg transition-all duration-200 hover:scale-105"
+            >
+              📸 上傳第一個作品
+            </Link>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {works.map(work => (
+          {displayedWorks.map(work => (
             <WorkCard
               key={work.id}
               work={work}
