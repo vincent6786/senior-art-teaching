@@ -61,6 +61,13 @@ function App() {
     Promise.all([refreshLocations(), refreshFilterOptions(), refreshSeniors()])
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 推導純字串版本，供 WorksGallery / UploadWork / WorkDetail 使用
+  const filterOptionsStrings = {
+    season: filterOptions.season.map(o => o.value),
+    festival: filterOptions.festival.map(o => o.value),
+    material_type: filterOptions.material_type.map(o => o.value),
+  }
+
   return (
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
@@ -90,11 +97,11 @@ function App() {
             <Route path="/" element={
               <WorksGallery
                 currentLocation={currentLocation}
-                filterOptions={filterOptions}
+                filterOptions={filterOptionsStrings}
               />
             } />
             <Route path="/upload" element={
-              <UploadWork filterOptions={filterOptions} />
+              <UploadWork filterOptions={filterOptionsStrings} />
             } />
             <Route path="/record/:workId" element={
               <TeachingRecord
@@ -103,7 +110,7 @@ function App() {
               />
             } />
             <Route path="/work/:workId" element={
-              <WorkDetail currentLocation={currentLocation} filterOptions={filterOptions} />
+              <WorkDetail currentLocation={currentLocation} filterOptions={filterOptionsStrings} />
             } />
             <Route path="/settings" element={
               <Settings
