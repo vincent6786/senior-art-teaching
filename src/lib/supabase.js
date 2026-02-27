@@ -21,7 +21,6 @@ export const worksAPI = {
 
     if (filters.season) query = query.eq('season', filters.season)
     if (filters.festival) query = query.eq('festival', filters.festival)
-    // 材料支援多選（逗號分隔），用 ilike 包含查詢
     if (filters.material_type) query = query.ilike('material_type', `%${filters.material_type}%`)
 
     const { data, error } = await query
@@ -64,8 +63,6 @@ export const worksAPI = {
     return true
   },
 
-  // 上傳作品主圖：依設定選擇 Cloudinary 或 Supabase(base64)
-  // 固定壓縮規格：最長邊 900px、品質 0.78 → 每張約 180 KB
   async uploadImage(file) {
     const mode = localStorage.getItem('storageMode') || 'cloudinary'
     if (mode === 'supabase') {
@@ -75,7 +72,6 @@ export const worksAPI = {
     }
   },
 
-  // 內部：base64 壓縮（存 Supabase）
   async _uploadImageBase64(file, maxSize = 900, quality = 0.78) {
     return new Promise((resolve, reject) => {
       const img = new Image()
@@ -100,7 +96,6 @@ export const worksAPI = {
     })
   },
 
-  // 內部：上傳到 Cloudinary（前端先壓縮再上傳）
   async _uploadImageCloudinary(file, folder = 'senior-art', maxSize = 900, quality = 0.78) {
     const CLOUD_NAME = 'dbq5zvmwv'
     const UPLOAD_PRESET = 'vetwuqsc'
@@ -138,7 +133,6 @@ export const worksAPI = {
     )
     const data = await res.json()
     if (data.error) throw new Error('Cloudinary 上傳失敗：' + data.error.message)
-    // 關閉 Cloudinary 的額外壓縮（我們已在前端統一壓縮好了）
     return data.secure_url
   },
 
@@ -197,7 +191,6 @@ export const locationsAPI = {
 // 3. 長輩相關
 // ============================================
 export const seniorsAPI = {
-  // 取全部長輩（含所屬中心名稱），供 App 全域使用
   async getAll() {
     const { data, error } = await supabase
       .from('seniors')
@@ -298,15 +291,13 @@ export const systemAPI = {
       ])
       if (worksRes.error) throw worksRes.error
 
-      // 細項統計
       let supabaseBytes = 0
-      let workBase64 = 0      // 作品主圖 → Supabase(base64)
-      let workCloudinary = 0  // 作品主圖 → Cloudinary
-      let fieldBase64 = 0     // 現場照片 → Supabase(base64)
-      let fieldCloudinary = 0 // 現場照片 → Cloudinary
+      let workBase64 = 0
+      let workCloudinary = 0
+      let fieldBase64 = 0
+      let fieldCloudinary = 0
       const worksCount = worksRes.data?.length || 0
 
-      // 作品主圖
       for (const w of worksRes.data || []) {
         if (!w.image_url) continue
         if (w.image_url.startsWith('data:')) {
@@ -317,7 +308,6 @@ export const systemAPI = {
         }
       }
 
-      // 教學現場照片
       for (const r of recordsRes.data || []) {
         for (const p of r.photos || []) {
           if (p?.startsWith('data:')) {
@@ -336,19 +326,13 @@ export const systemAPI = {
       const cloudinaryTotal = workCloudinary + fieldCloudinary
       const supabaseTotal = workBase64 + fieldBase64
 
-      // ── 固定壓縮規格 ──────────────────────────────
-      // 作品主圖：900px / 0.78 quality → 約 180 KB
-      // 現場照片：650px / 0.72 quality → 約  90 KB
-      // Supabase base64 直接由字串長度精確計算，誤差極小
-      // Cloudinary 依固定規格計算，準確度高
-      // ─────────────────────────────────────────────
-      const WORK_PHOTO_KB  = 180  // 作品主圖固定規格
-      const FIELD_PHOTO_KB =  90  // 現場照片固定規格
+      const WORK_PHOTO_KB = 180
+      const FIELD_PHOTO_KB = 90
 
       const cloudinaryEstimatedBytes =
         (workCloudinary * WORK_PHOTO_KB * 1024) +
         (fieldCloudinary * FIELD_PHOTO_KB * 1024)
-      const cloudinaryLimitBytes = 25 * 1024 * 1024 * 1024 // 25 GB
+      const cloudinaryLimitBytes = 25 * 1024 * 1024 * 1024
       const cloudinaryUsedMB = (cloudinaryEstimatedBytes / (1024 * 1024)).toFixed(1)
       const cloudinaryUsedPercent = ((cloudinaryEstimatedBytes / cloudinaryLimitBytes) * 100).toFixed(3)
       const cloudinaryRemainingGB = Math.max(0, 25 - cloudinaryEstimatedBytes / (1024 * 1024 * 1024)).toFixed(2)
@@ -359,18 +343,14 @@ export const systemAPI = {
         limitMB: 500,
         usedPercent,
         remainingMB: Math.max(0, 500 - parseFloat(usedMB)).toFixed(2),
-        // 總計
         totalPhotos,
         worksCount,
-        // Supabase 細項
         supabaseTotal,
         workBase64,
         fieldBase64,
-        // Cloudinary 細項
         cloudinaryTotal,
         workCloudinary,
         fieldCloudinary,
-        // Cloudinary 估算用量
         cloudinaryUsedMB,
         cloudinaryUsedPercent,
         cloudinaryRemainingGB
@@ -451,41 +431,27 @@ export const systemAPI = {
         results.seniors = backup.data.seniors.length
       }
       if (backup.data.works?.length > 0) {
-        const { error } = await supabase.from('works').insert(
-          backup.data.works.map(w => ({
-            id: w.id, title: w.title, image_url: w.image_url, thumbnail_url: w.thumbnail_url || null,
-            season: w.season, festival: w.festival, material_type: w.material_type,
-            description: w.description || '', created_at: w.created_at, updated_at: w.updated_at
-          }))
-        )
+        const { error } = await supabase.from('works').insert(backup.data.works)
         if (error) throw new Error('還原作品失敗: ' + error.message)
         results.works = backup.data.works.length
       }
       if (backup.data.teaching_records?.length > 0) {
-        const { error } = await supabase.from('teaching_records').insert(
-          backup.data.teaching_records.map(r => ({
-            id: r.id, work_id: r.work_id, location_id: r.location_id,
-            teaching_date: r.teaching_date, notes: r.notes || '',
-            photos: r.photos || [], created_at: r.created_at
-          }))
-        )
+        const { error } = await supabase.from('teaching_records').insert(backup.data.teaching_records)
         if (error) throw new Error('還原教學記錄失敗: ' + error.message)
         results.records = backup.data.teaching_records.length
       }
       if (backup.data.teaching_seniors?.length > 0) {
-        const { error } = await supabase.from('teaching_seniors').insert(
-          backup.data.teaching_seniors.map(ts => ({
-            id: ts.id, teaching_record_id: ts.teaching_record_id, senior_id: ts.senior_id,
-            completion_status: ts.completion_status, reaction: ts.reaction || '', created_at: ts.created_at
-          }))
-        )
-        if (error) console.warn('部分教學長輩記錄還原失敗:', error.message)
+        const { error } = await supabase.from('teaching_seniors').insert(backup.data.teaching_seniors)
+        if (error) throw new Error('還原參與記錄失敗: ' + error.message)
       }
       if (backup.data.filter_options?.length > 0) {
         const { error } = await supabase.from('filter_options').insert(
           backup.data.filter_options.map(f => ({
-            id: f.id, category: f.category, value: f.value,
-            display_order: f.display_order || 0, is_active: f.is_active !== undefined ? f.is_active : true,
+            id: f.id,
+            category: f.category,
+            value: f.value,
+            display_order: f.display_order,
+            is_active: f.is_active,
             created_at: f.created_at
           }))
         )
@@ -503,14 +469,12 @@ export const systemAPI = {
 // 6. 篩選條件管理 API
 // ============================================
 
-// 永遠可用的硬編碼預設值（資料庫空或失敗時 fallback）
 const DEFAULT_FILTER_OPTIONS = {
   season: ['春', '夏', '秋', '冬', '不限'],
   festival: ['無', '春節', '元宵', '清明', '端午', '中秋', '重陽', '聖誕', '母親節', '父親節', '兒童節', '教師節', '情人節'],
   material_type: ['紙類', '黏土', '布料', '水彩', '粉蠟筆', '色鉛筆', '毛線', '不織布', '珠珠', '鋁線', '木材', '貝殼', '乾燥花', '回收材料', '綜合媒材', '其他']
 }
 
-// 內部：將預設字串陣列轉成 {id: null, value} 物件陣列
 function _defaultToObjects(defaults) {
   return Object.fromEntries(
     Object.entries(defaults).map(([cat, vals]) => [
@@ -521,8 +485,6 @@ function _defaultToObjects(defaults) {
 }
 
 export const filterOptionsAPI = {
-  // 回傳格式：{ season: [{id, value}, ...], festival: [...], material_type: [...] }
-  // 當無資料庫資料時，id 為 null（代表預設值，不可刪除）
   async getAll() {
     try {
       const { data, error } = await supabase
@@ -531,7 +493,6 @@ export const filterOptionsAPI = {
         .eq('is_active', true)
         .order('display_order')
 
-      // 資料庫錯誤或 RLS 阻擋 → 回傳預設值物件
       if (error) {
         console.warn('filter_options 查詢失敗，使用預設值:', error.message)
         return _defaultToObjects(DEFAULT_FILTER_OPTIONS)
@@ -544,7 +505,6 @@ export const filterOptionsAPI = {
         }
       })
 
-      // 資料庫是空的 → 回傳預設值物件（不嘗試寫入，避免 UNIQUE 衝突）
       const hasData = Object.values(grouped).some(arr => arr.length > 0)
       if (!hasData) {
         console.info('filter_options 資料表是空的，使用預設值')
@@ -558,28 +518,50 @@ export const filterOptionsAPI = {
     }
   },
 
+  // ✅ 修正：加入 try/catch 與清楚的錯誤訊息
   async create(category, value, displayOrder = 999) {
-    const { data, error } = await supabase
-      .from('filter_options')
-      .insert([{ category, value, display_order: displayOrder, is_active: true }])
-      .select()
-    if (error) throw error
-    return data[0]
+    try {
+      const { data, error } = await supabase
+        .from('filter_options')
+        .insert([{ category, value, display_order: displayOrder, is_active: true }])
+        .select()
+      if (error) throw new Error(error.message)
+      return data[0]
+    } catch (err) {
+      // 如果是「資料表不存在」，給出更明確的提示
+      if (err.message?.includes('filter_options')) {
+        throw new Error('filter_options 資料表尚未建立，請到 Supabase SQL Editor 執行建表指令')
+      }
+      throw new Error('新增篩選條件失敗：' + err.message)
+    }
   },
 
+  // ✅ 修正：加入 try/catch 與清楚的錯誤訊息
   async update(id, newValue) {
-    const { data, error } = await supabase
-      .from('filter_options')
-      .update({ value: newValue })
-      .eq('id', id)
-      .select()
-    if (error) throw error
-    return data[0]
+    try {
+      const { data, error } = await supabase
+        .from('filter_options')
+        .update({ value: newValue })
+        .eq('id', id)
+        .select()
+      if (error) throw new Error(error.message)
+      return data[0]
+    } catch (err) {
+      throw new Error('更新篩選條件失敗：' + err.message)
+    }
   },
 
+  // ✅ 修正：加入 try/catch 與清楚的錯誤訊息
   async delete(id) {
-    const { error } = await supabase.from('filter_options').delete().eq('id', id)
-    if (error) throw error
-    return true
+    try {
+      const { error } = await supabase
+        .from('filter_options')
+        .delete()
+        .eq('id', id)
+      if (error) throw new Error(error.message)
+      return true
+    } catch (err) {
+      throw new Error('刪除篩選條件失敗：' + err.message)
+    }
   }
 }
